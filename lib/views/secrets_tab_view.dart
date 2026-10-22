@@ -38,9 +38,9 @@ class _SecretsTabViewState extends State<SecretsTabView> {
   Widget build(BuildContext context) {
     if (widget.items.isEmpty) {
       return const EmptyTabView(
-        tabTitle: 'Secrets',
+        tabTitle: 'Things to Remember',
         explanation:
-            'No private secrets yet. Safely store recovery codes, WiFi passwords, and private personal memos.',
+            'No items saved yet. Safely store recovery codes, WiFi passwords, and private personal memos.',
       );
     }
 
@@ -53,7 +53,7 @@ class _SecretsTabViewState extends State<SecretsTabView> {
 
     return Column(
       children: [
-        // 🔍 Minimalist Dedicated Search Bar for Secrets
+        // 🔍 Minimalist Dedicated Search Bar
         Padding(
           padding: const EdgeInsets.fromLTRB(22, 4, 22, 10),
           child: Container(
@@ -76,7 +76,7 @@ class _SecretsTabViewState extends State<SecretsTabView> {
                 color: AppColors.textPrimary,
               ),
               decoration: InputDecoration(
-                hintText: 'Search secrets (e.g. WiFi, Safe Pin)...',
+                hintText: 'Search things to remember (e.g. WiFi, Codes)...',
                 hintStyle: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textMuted,
@@ -119,7 +119,7 @@ class _SecretsTabViewState extends State<SecretsTabView> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'No secrets found for "$_searchQuery"',
+                          'No items found for "$_searchQuery"',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 16,

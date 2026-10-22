@@ -37,16 +37,16 @@ class AddSecretModal {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ModalComponents.header(context: ctx, title: 'Add New Secret'),
+                  ModalComponents.header(context: ctx, title: 'Add Thing to Remember'),
                   const SizedBox(height: 18),
                   ModalComponents.input(
                     controller: titleCtrl,
-                    label: 'Secret Title (e.g. WiFi, Safe Pin)',
+                    label: 'Title (e.g. WiFi Password, Safe Code)',
                   ),
                   const SizedBox(height: 12),
                   ModalComponents.input(
                     controller: contentCtrl,
-                    label: 'Secret Content / Note',
+                    label: 'Details / Note to remember',
                     maxLines: 4,
                   ),
                   const SizedBox(height: 14),

@@ -62,7 +62,7 @@ class EmptyTabView extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             const Text(
-              'End-to-End Encrypted via Neon Cloud',
+              'End-to-End Encrypted Vault',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,

@@ -81,7 +81,7 @@ class DeleteConfirmationModal {
                           ),
                         ),
                         const TextSpan(
-                          text: '? This action cannot be undone and will be erased from Neon Vault.',
+                          text: '? This action cannot be undone and will be permanently erased.',
                         ),
                       ],
                     ),

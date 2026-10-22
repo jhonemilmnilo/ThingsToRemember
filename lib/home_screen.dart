@@ -43,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Clean Typography-Only Tabs (No Icons)
   final List<Map<String, String>> _tabs = [
     {'type': 'password', 'title': 'Accounts'},
-    {'type': 'secret', 'title': 'Secrets'},
+    {'type': 'secret', 'title': 'Things to Remember'},
     {'type': 'contact', 'title': 'Contacts'},
     {'type': 'birthday', 'title': 'Birthdays'},
   ];

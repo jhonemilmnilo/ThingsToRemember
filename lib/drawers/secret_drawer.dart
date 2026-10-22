@@ -56,7 +56,7 @@ class SecretDrawer {
                         children: [
                           Expanded(
                             child: Text(
-                              isEditing ? 'Edit Secret' : currentTitle,
+                              isEditing ? 'Edit Note' : currentTitle,
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
