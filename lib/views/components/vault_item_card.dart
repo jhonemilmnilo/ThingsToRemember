@@ -5,6 +5,7 @@ class VaultItemCard extends StatelessWidget {
   final String title;
   final String? subtitle;
   final String? noteContent;
+  final String? tag;
   final bool isPinned;
   final bool isCompact;
   final VoidCallback onTap;
@@ -15,6 +16,7 @@ class VaultItemCard extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.noteContent,
+    this.tag,
     this.isPinned = false,
     this.isCompact = false,
     required this.onTap,
@@ -48,7 +50,7 @@ class VaultItemCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Expanded(
+                    Flexible(
                       child: Text(
                         title,
                         style: const TextStyle(
@@ -59,6 +61,30 @@ class VaultItemCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    if (tag != null && tag!.trim().isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: AppColors.pistachioMint.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.primaryMatcha.withValues(alpha: 0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          tag!.trim(),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primaryMatcha,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                    const Spacer(),
                     if (isPinned)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

@@ -303,7 +303,6 @@ class _HomeScreenState extends State<HomeScreen> {
           items: _contacts,
           userId: _activeUserId,
           onSaved: () => _reSortListAndNotify(_contacts, 'Contact updated successfully!'),
-          onPinnedToggled: () => _reSortListAndNotify(_contacts, null),
           onDelete: (item) => _confirmDeleteItem(
             title: item['name'] ?? 'Contact',
             itemTypeLabel: 'Contact',

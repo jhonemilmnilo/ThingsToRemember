@@ -11,11 +11,9 @@ class ContactDrawer {
     required dynamic item,
     required String userId,
     required VoidCallback onSaved,
-    required VoidCallback onPinnedToggled,
   }) {
     bool isEditing = false;
     bool isSaving = false;
-    bool isPinned = item['is_pinned'] == true;
 
     final nameCtrl = TextEditingController(text: item['name'] ?? '');
     final phoneCtrl = TextEditingController(text: item['phone_number'] ?? '');
@@ -131,10 +129,6 @@ class ContactDrawer {
                         ),
                         const SizedBox(height: 14),
 
-                        DrawerComponents.pinToggleRow(
-                          isPinned: isPinned,
-                          onChanged: (val) => setDrawerState(() => isPinned = val),
-                        ),
                         const SizedBox(height: 18),
 
                         SizedBox(
@@ -155,13 +149,11 @@ class ContactDrawer {
                                         'phone_number': phoneCtrl.text.trim(),
                                         'relationship': relCtrl.text.trim(),
                                         'notes': notesCtrl.text.trim(),
-                                        'is_pinned': isPinned,
                                       },
                                     );
 
                                     if (!context.mounted) return;
                                     if (updated) {
-                                      item['is_pinned'] = isPinned;
                                       Navigator.pop(ctx);
                                       onSaved();
                                     } else {
@@ -188,7 +180,7 @@ class ContactDrawer {
                           label: 'PHONE NUMBER',
                           value: item['phone_number'] ?? '',
                           canCopy: true,
-                        ),
+                         ),
                         DrawerComponents.viewField(
                           context: modalCtx,
                           label: 'RELATIONSHIP',
@@ -202,23 +194,6 @@ class ContactDrawer {
                             value: item['notes'].toString().trim(),
                             canCopy: false,
                           ),
-                        const SizedBox(height: 6),
-                        DrawerComponents.pinToggleRow(
-                          isPinned: isPinned,
-                          onChanged: (val) async {
-                            setDrawerState(() {
-                              isPinned = val;
-                              item['is_pinned'] = val;
-                            });
-                            onPinnedToggled();
-                            await NeonSyncService.updateVaultItem(
-                              userId: userId,
-                              itemId: item['id'].toString(),
-                              type: 'contact',
-                              data: {'is_pinned': val},
-                            );
-                          },
-                        ),
                       ],
                     ],
                   ),
