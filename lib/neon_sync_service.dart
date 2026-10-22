@@ -111,4 +111,31 @@ class NeonSyncService {
       return false;
     }
   }
+
+  /// Delete an item from Neon DB
+  static Future<bool> deleteVaultItem({
+    required String userId,
+    required String itemId,
+    required String type,
+  }) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/api/vault/items'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'type': type,
+          'userId': userId,
+          'itemId': itemId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return decoded['success'] == true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
 }

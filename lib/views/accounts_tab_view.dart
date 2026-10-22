@@ -8,12 +8,14 @@ class AccountsTabView extends StatefulWidget {
   final List<dynamic> items;
   final String? userId;
   final VoidCallback onSaved;
+  final Function(dynamic item) onDelete;
 
   const AccountsTabView({
     super.key,
     required this.items,
     required this.userId,
     required this.onSaved,
+    required this.onDelete,
   });
 
   @override
@@ -168,6 +170,7 @@ class _AccountsTabViewState extends State<AccountsTabView> {
                           onSaved: widget.onSaved,
                         );
                       },
+                      onLongPress: () => widget.onDelete(item),
                     );
                   },
                 ),

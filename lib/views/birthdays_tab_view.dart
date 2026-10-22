@@ -8,6 +8,7 @@ class BirthdaysTabView extends StatelessWidget {
   final String? userId;
   final VoidCallback onSaved;
   final VoidCallback onPinnedToggled;
+  final Function(dynamic item) onDelete;
 
   const BirthdaysTabView({
     super.key,
@@ -15,6 +16,7 @@ class BirthdaysTabView extends StatelessWidget {
     required this.userId,
     required this.onSaved,
     required this.onPinnedToggled,
+    required this.onDelete,
   });
 
   @override
@@ -49,6 +51,7 @@ class BirthdaysTabView extends StatelessWidget {
               onPinnedToggled: onPinnedToggled,
             );
           },
+          onLongPress: () => onDelete(item),
         );
       },
     );

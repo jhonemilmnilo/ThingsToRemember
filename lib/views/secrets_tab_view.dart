@@ -9,6 +9,7 @@ class SecretsTabView extends StatefulWidget {
   final String? userId;
   final VoidCallback onSaved;
   final VoidCallback onPinnedToggled;
+  final Function(dynamic item) onDelete;
 
   const SecretsTabView({
     super.key,
@@ -16,6 +17,7 @@ class SecretsTabView extends StatefulWidget {
     required this.userId,
     required this.onSaved,
     required this.onPinnedToggled,
+    required this.onDelete,
   });
 
   @override
@@ -169,6 +171,7 @@ class _SecretsTabViewState extends State<SecretsTabView> {
                           onPinnedToggled: widget.onPinnedToggled,
                         );
                       },
+                      onLongPress: () => widget.onDelete(item),
                     );
                   },
                 ),

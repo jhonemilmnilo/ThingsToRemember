@@ -11,6 +11,7 @@ import 'modals/add_account_modal.dart';
 import 'modals/add_secret_modal.dart';
 import 'modals/add_contact_modal.dart';
 import 'modals/add_birthday_modal.dart';
+import 'modals/delete_confirmation_modal.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userName;
@@ -275,6 +276,13 @@ class _HomeScreenState extends State<HomeScreen> {
           items: _passwords,
           userId: _activeUserId,
           onSaved: () => _reSortListAndNotify(_passwords, 'Changes saved successfully!'),
+          onDelete: (item) => _confirmDeleteItem(
+            title: item['title'] ?? 'Account',
+            itemTypeLabel: 'Account',
+            type: 'password',
+            itemId: item['id'].toString(),
+            targetList: _passwords,
+          ),
         );
       case 1:
         return SecretsTabView(
@@ -282,6 +290,13 @@ class _HomeScreenState extends State<HomeScreen> {
           userId: _activeUserId,
           onSaved: () => _reSortListAndNotify(_secrets, 'Secret updated successfully!'),
           onPinnedToggled: () => _reSortListAndNotify(_secrets, null),
+          onDelete: (item) => _confirmDeleteItem(
+            title: item['title'] ?? 'Secret Note',
+            itemTypeLabel: 'Secret',
+            type: 'secret',
+            itemId: item['id'].toString(),
+            targetList: _secrets,
+          ),
         );
       case 2:
         return ContactsTabView(
@@ -289,6 +304,13 @@ class _HomeScreenState extends State<HomeScreen> {
           userId: _activeUserId,
           onSaved: () => _reSortListAndNotify(_contacts, 'Contact updated successfully!'),
           onPinnedToggled: () => _reSortListAndNotify(_contacts, null),
+          onDelete: (item) => _confirmDeleteItem(
+            title: item['name'] ?? 'Contact',
+            itemTypeLabel: 'Contact',
+            type: 'contact',
+            itemId: item['id'].toString(),
+            targetList: _contacts,
+          ),
         );
       case 3:
       default:
@@ -297,8 +319,48 @@ class _HomeScreenState extends State<HomeScreen> {
           userId: _activeUserId,
           onSaved: () => _reSortListAndNotify(_birthdays, 'Birthday updated successfully!'),
           onPinnedToggled: () => _reSortListAndNotify(_birthdays, null),
+          onDelete: (item) => _confirmDeleteItem(
+            title: item['name'] ?? 'Birthday',
+            itemTypeLabel: 'Birthday',
+            type: 'birthday',
+            itemId: item['id'].toString(),
+            targetList: _birthdays,
+          ),
         );
     }
+  }
+
+  void _confirmDeleteItem({
+    required String title,
+    required String itemTypeLabel,
+    required String type,
+    required String itemId,
+    required List<dynamic> targetList,
+  }) {
+    if (_activeUserId == null) return;
+
+    DeleteConfirmationModal.show(
+      context: context,
+      title: title,
+      itemTypeLabel: itemTypeLabel,
+      type: type,
+      itemId: itemId,
+      userId: _activeUserId!,
+      onDeleted: () {
+        setState(() {
+          targetList.removeWhere((element) => element['id'].toString() == itemId);
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppColors.primaryMatcha,
+              behavior: SnackBarBehavior.floating,
+              content: Text('$itemTypeLabel deleted successfully!'),
+            ),
+          );
+        }
+      },
+    );
   }
 
   void _reSortListAndNotify(List<dynamic> targetList, String? message) {

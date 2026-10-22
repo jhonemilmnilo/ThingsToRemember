@@ -8,6 +8,7 @@ class VaultItemCard extends StatelessWidget {
   final bool isPinned;
   final bool isCompact;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const VaultItemCard({
     super.key,
@@ -17,6 +18,7 @@ class VaultItemCard extends StatelessWidget {
     this.isPinned = false,
     this.isCompact = false,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -26,10 +28,6 @@ class VaultItemCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(isCompact ? 14 : 18),
-        border: Border.all(
-          color: isPinned ? AppColors.primaryMatcha.withValues(alpha: 0.5) : AppColors.borderMuted,
-          width: isPinned ? 1.5 : 1.2,
-        ),
       ),
       child: Material(
         color: Colors.transparent,
@@ -37,6 +35,7 @@ class VaultItemCard extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(isCompact ? 14 : 18),
           onTap: onTap,
+          onLongPress: onLongPress,
           splashColor: AppColors.primaryMatcha.withValues(alpha: 0.08),
           highlightColor: AppColors.primaryMatcha.withValues(alpha: 0.04),
           child: Padding(

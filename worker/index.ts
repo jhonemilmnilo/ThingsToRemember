@@ -205,6 +205,34 @@ export default {
       }
     }
 
+    // --- 4. DELETE VAULT ITEM ---
+    if (request.method === 'DELETE' && url.pathname === '/api/vault/items') {
+      try {
+        const body = await request.json() as any;
+        const { type, userId, itemId } = body;
+
+        if (!type || !userId || !itemId) {
+          return Response.json({ success: false, error: 'Missing required parameters' }, { status: 400, headers: corsHeaders });
+        }
+
+        if (type === 'password') {
+          await sql`DELETE FROM credentials WHERE id = ${itemId} AND user_id = ${userId};`;
+        } else if (type === 'secret') {
+          await sql`DELETE FROM secure_notes WHERE id = ${itemId} AND user_id = ${userId};`;
+        } else if (type === 'contact') {
+          await sql`DELETE FROM emergency_contacts WHERE id = ${itemId} AND user_id = ${userId};`;
+        } else if (type === 'birthday') {
+          await sql`DELETE FROM family_members WHERE id = ${itemId} AND user_id = ${userId};`;
+        } else {
+          return Response.json({ success: false, error: 'Invalid type' }, { status: 400, headers: corsHeaders });
+        }
+
+        return Response.json({ success: true, message: 'Item deleted successfully' }, { headers: corsHeaders });
+      } catch (err: any) {
+        return Response.json({ success: false, error: err.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
     return Response.json({ error: 'Endpoint Not Found' }, { status: 404, headers: corsHeaders });
   },
 };

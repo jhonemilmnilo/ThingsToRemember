@@ -8,6 +8,7 @@ class ContactsTabView extends StatelessWidget {
   final String? userId;
   final VoidCallback onSaved;
   final VoidCallback onPinnedToggled;
+  final Function(dynamic item) onDelete;
 
   const ContactsTabView({
     super.key,
@@ -15,6 +16,7 @@ class ContactsTabView extends StatelessWidget {
     required this.userId,
     required this.onSaved,
     required this.onPinnedToggled,
+    required this.onDelete,
   });
 
   @override
@@ -49,6 +51,7 @@ class ContactsTabView extends StatelessWidget {
               onPinnedToggled: onPinnedToggled,
             );
           },
+          onLongPress: () => onDelete(item),
         );
       },
     );
