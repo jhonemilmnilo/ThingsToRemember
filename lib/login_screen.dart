@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'theme.dart';
 
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,42 +13,26 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email', 'profile'],
-  );
+
+  static const String _neonAuthUrl =
+      'https://ep-icy-lab-az0dwxto.neonauth.c-3.ap-southeast-1.aws.neon.tech/neondb/auth/sign-in/social?provider=google';
 
   void _handleGoogleSignIn() async {
     setState(() => _isLoading = true);
 
     try {
-      // 🚀 Pops up native Google Account selector bottom sheet
-      final GoogleSignInAccount? account = await _googleSignIn.signIn();
+      final Uri uri = Uri.parse(_neonAuthUrl);
+
+      final bool launched = await launchUrl(
+        uri,
+        mode: LaunchMode.inAppBrowserView,
+      );
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      if (account != null) {
-        // User selected an account
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.primaryMatcha,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            content: Row(
-              children: [
-                const Icon(LucideIcons.checkCircle2, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Welcome, ${account.displayName ?? account.email}!',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
+      if (!launched) {
+        throw 'Could not launch Google Sign In window';
       }
     } catch (error) {
       if (!mounted) return;
