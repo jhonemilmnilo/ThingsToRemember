@@ -7,10 +7,12 @@ import 'views/accounts_tab_view.dart';
 import 'views/secrets_tab_view.dart';
 import 'views/contacts_tab_view.dart';
 import 'views/birthdays_tab_view.dart';
+import 'views/wifi_tab_view.dart';
 import 'modals/add_account_modal.dart';
 import 'modals/add_secret_modal.dart';
 import 'modals/add_contact_modal.dart';
 import 'modals/add_birthday_modal.dart';
+import 'modals/add_wifi_modal.dart';
 import 'modals/delete_confirmation_modal.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -39,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _secrets = [];
   List<dynamic> _contacts = [];
   List<dynamic> _birthdays = [];
+  List<dynamic> _wifiNetworks = [];
 
   // Clean Typography-Only Tabs (No Icons)
   final List<Map<String, String>> _tabs = [
@@ -46,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
     {'type': 'secret', 'title': 'Things to Remember'},
     {'type': 'contact', 'title': 'Contacts'},
     {'type': 'birthday', 'title': 'Birthdays'},
+    {'type': 'wifi', 'title': 'Wi-Fi'},
   ];
 
   @override
@@ -71,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _secrets = result['secrets'] ?? [];
         _contacts = result['contacts'] ?? [];
         _birthdays = result['birthdays'] ?? [];
+        _wifiNetworks = result['wifi'] ?? [];
         _isLoading = false;
       });
     } else {
@@ -115,8 +120,15 @@ class _HomeScreenState extends State<HomeScreen> {
         );
         break;
       case 3:
-      default:
         AddBirthdayModal.show(
+          context: context,
+          userId: _activeUserId!,
+          onAdded: _loadVaultData,
+        );
+        break;
+      case 4:
+      default:
+        AddWifiModal.show(
           context: context,
           userId: _activeUserId!,
           onAdded: _loadVaultData,
@@ -127,7 +139,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final int totalCount = _passwords.length + _secrets.length + _contacts.length + _birthdays.length;
+    final int totalCount = _passwords.length +
+        _secrets.length +
+        _contacts.length +
+        _birthdays.length +
+        _wifiNetworks.length;
 
     return Scaffold(
       backgroundColor: AppColors.oatMilkBg,
@@ -204,6 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (index == 1) count = _secrets.length;
                   if (index == 2) count = _contacts.length;
                   if (index == 3) count = _birthdays.length;
+                  if (index == 4) count = _wifiNetworks.length;
 
                   return GestureDetector(
                     onTap: () => setState(() => _selectedTabIndex = index),
@@ -312,7 +329,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       case 3:
-      default:
         return BirthdaysTabView(
           items: _birthdays,
           userId: _activeUserId,
@@ -323,6 +339,20 @@ class _HomeScreenState extends State<HomeScreen> {
             type: 'birthday',
             itemId: item['id'].toString(),
             targetList: _birthdays,
+          ),
+        );
+      case 4:
+      default:
+        return WifiTabView(
+          items: _wifiNetworks,
+          userId: _activeUserId,
+          onSaved: () => _reSortListAndNotify(_wifiNetworks, 'Wi-Fi network updated successfully!'),
+          onDelete: (item) => _confirmDeleteItem(
+            title: item['ssid'] ?? 'Wi-Fi Network',
+            itemTypeLabel: 'Wi-Fi Network',
+            type: 'wifi',
+            itemId: item['id'].toString(),
+            targetList: _wifiNetworks,
           ),
         );
     }

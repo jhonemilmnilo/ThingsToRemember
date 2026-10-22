@@ -73,11 +73,12 @@ export default {
           return Response.json({ success: false, error: 'userId or email is required' }, { status: 400, headers: corsHeaders });
         }
 
-        const [passwords, secrets, contacts, birthdays] = await Promise.all([
+        const [passwords, secrets, contacts, birthdays, wifi] = await Promise.all([
           sql`SELECT * FROM credentials WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, created_at DESC;`,
           sql`SELECT * FROM secure_notes WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, created_at DESC;`,
           sql`SELECT * FROM emergency_contacts WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, created_at DESC;`,
           sql`SELECT * FROM family_members WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, birthdate ASC;`,
+          sql`SELECT * FROM wifi_networks WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, created_at DESC;`,
         ]);
 
         return Response.json({
@@ -87,6 +88,7 @@ export default {
           secrets,
           contacts,
           birthdays,
+          wifi,
         }, { headers: corsHeaders });
       } catch (err: any) {
         return Response.json({ success: false, error: err.message }, { status: 500, headers: corsHeaders });
@@ -126,6 +128,12 @@ export default {
           inserted = await sql`
             INSERT INTO family_members (user_id, name, relationship, birthdate, notes, is_pinned)
             VALUES (${userId}, ${data.name}, ${data.relationship || 'Family'}, ${data.birthdate}, ${data.notes || null}, ${data.is_pinned ?? false})
+            RETURNING *;
+          `;
+        } else if (type === 'wifi') {
+          inserted = await sql`
+            INSERT INTO wifi_networks (user_id, ssid, password, security_type, notes, is_pinned)
+            VALUES (${userId}, ${data.ssid}, ${data.password}, ${data.security_type || 'WPA'}, ${data.notes || null}, ${data.is_pinned ?? false})
             RETURNING *;
           `;
         } else {
@@ -195,6 +203,18 @@ export default {
             WHERE id = ${itemId} AND user_id = ${userId}
             RETURNING *;
           `;
+        } else if (type === 'wifi') {
+          updated = await sql`
+            UPDATE wifi_networks
+            SET ssid = COALESCE(${data.ssid}, ssid),
+                password = COALESCE(${data.password}, password),
+                security_type = COALESCE(${data.security_type}, security_type),
+                notes = ${data.notes !== undefined ? (data.notes || null) : sql`notes`},
+                is_pinned = COALESCE(${data.is_pinned}, is_pinned),
+                updated_at = NOW()
+            WHERE id = ${itemId} AND user_id = ${userId}
+            RETURNING *;
+          `;
         } else {
           return Response.json({ success: false, error: 'Invalid type' }, { status: 400, headers: corsHeaders });
         }
@@ -223,6 +243,8 @@ export default {
           await sql`DELETE FROM emergency_contacts WHERE id = ${itemId} AND user_id = ${userId};`;
         } else if (type === 'birthday') {
           await sql`DELETE FROM family_members WHERE id = ${itemId} AND user_id = ${userId};`;
+        } else if (type === 'wifi') {
+          await sql`DELETE FROM wifi_networks WHERE id = ${itemId} AND user_id = ${userId};`;
         } else {
           return Response.json({ success: false, error: 'Invalid type' }, { status: 400, headers: corsHeaders });
         }
