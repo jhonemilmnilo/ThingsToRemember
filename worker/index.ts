@@ -1,7 +1,9 @@
 import { neon } from '@neondatabase/serverless';
+import { encryptVaultField, decryptVaultField } from './crypto';
 
 export interface Env {
   DATABASE_URL: string;
+  AES_VAULT_MASTER_KEY: string;
 }
 
 export default {
@@ -73,13 +75,37 @@ export default {
           return Response.json({ success: false, error: 'userId or email is required' }, { status: 400, headers: corsHeaders });
         }
 
-        const [passwords, secrets, contacts, birthdays, wifi] = await Promise.all([
+        const [passwordsRaw, secretsRaw, contacts, birthdays, wifiRaw] = await Promise.all([
           sql`SELECT * FROM credentials WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, created_at DESC;`,
           sql`SELECT * FROM secure_notes WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, created_at DESC;`,
           sql`SELECT * FROM emergency_contacts WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, created_at DESC;`,
           sql`SELECT * FROM family_members WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, birthdate ASC;`,
           sql`SELECT * FROM wifi_networks WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, created_at DESC;`,
         ]);
+
+        const masterKey = env.AES_VAULT_MASTER_KEY;
+
+        // Decrypt sensitive fields on the fly
+        const passwords = await Promise.all(
+          passwordsRaw.map(async (row: any) => ({
+            ...row,
+            encrypted_password: await decryptVaultField(row.encrypted_password, masterKey),
+          }))
+        );
+
+        const secrets = await Promise.all(
+          secretsRaw.map(async (row: any) => ({
+            ...row,
+            content: await decryptVaultField(row.content, masterKey),
+          }))
+        );
+
+        const wifi = await Promise.all(
+          wifiRaw.map(async (row: any) => ({
+            ...row,
+            password: await decryptVaultField(row.password, masterKey),
+          }))
+        );
 
         return Response.json({
           success: true,
@@ -105,17 +131,21 @@ export default {
           return Response.json({ success: false, error: 'Missing type, userId, or data' }, { status: 400, headers: corsHeaders });
         }
 
+        const masterKey = env.AES_VAULT_MASTER_KEY;
+
         let inserted;
         if (type === 'password') {
+          const cipherPass = await encryptVaultField(data.password, masterKey);
           inserted = await sql`
             INSERT INTO credentials (user_id, title, username_or_email, encrypted_password, notes, is_pinned)
-            VALUES (${userId}, ${data.title}, ${data.username_or_email}, ${data.password}, ${data.notes || null}, ${data.is_pinned ?? false})
+            VALUES (${userId}, ${data.title}, ${data.username_or_email}, ${cipherPass}, ${data.notes || null}, ${data.is_pinned ?? false})
             RETURNING *;
           `;
         } else if (type === 'secret') {
+          const cipherContent = await encryptVaultField(data.content, masterKey);
           inserted = await sql`
             INSERT INTO secure_notes (user_id, title, content, is_pinned)
-            VALUES (${userId}, ${data.title}, ${data.content}, ${data.is_pinned ?? false})
+            VALUES (${userId}, ${data.title}, ${cipherContent}, ${data.is_pinned ?? false})
             RETURNING *;
           `;
         } else if (type === 'contact') {
@@ -131,9 +161,10 @@ export default {
             RETURNING *;
           `;
         } else if (type === 'wifi') {
+          const cipherWifiPass = await encryptVaultField(data.password, masterKey);
           inserted = await sql`
             INSERT INTO wifi_networks (user_id, ssid, password, security_type, notes, is_pinned)
-            VALUES (${userId}, ${data.ssid}, ${data.password}, ${data.security_type || 'WPA'}, ${data.notes || null}, ${data.is_pinned ?? false})
+            VALUES (${userId}, ${data.ssid}, ${cipherWifiPass}, ${data.security_type || 'WPA'}, ${data.notes || null}, ${data.is_pinned ?? false})
             RETURNING *;
           `;
         } else {
@@ -156,13 +187,19 @@ export default {
           return Response.json({ success: false, error: 'Missing type, userId, itemId, or data' }, { status: 400, headers: corsHeaders });
         }
 
+        const masterKey = env.AES_VAULT_MASTER_KEY;
+
         let updated;
         if (type === 'password') {
+          const cipherPass = data.password !== undefined
+              ? await encryptVaultField(data.password, masterKey)
+              : null;
+
           updated = await sql`
             UPDATE credentials
             SET title = COALESCE(${data.title}, title),
                 username_or_email = COALESCE(${data.username_or_email}, username_or_email),
-                encrypted_password = COALESCE(${data.password}, encrypted_password),
+                encrypted_password = ${cipherPass !== null ? cipherPass : sql`encrypted_password`},
                 notes = ${data.notes !== undefined ? (data.notes || null) : sql`notes`},
                 is_pinned = COALESCE(${data.is_pinned}, is_pinned),
                 updated_at = NOW()
@@ -170,10 +207,14 @@ export default {
             RETURNING *;
           `;
         } else if (type === 'secret') {
+          const cipherContent = data.content !== undefined
+              ? await encryptVaultField(data.content, masterKey)
+              : null;
+
           updated = await sql`
             UPDATE secure_notes
             SET title = COALESCE(${data.title}, title),
-                content = COALESCE(${data.content}, content),
+                content = ${cipherContent !== null ? cipherContent : sql`content`},
                 is_pinned = COALESCE(${data.is_pinned}, is_pinned),
                 updated_at = NOW()
             WHERE id = ${itemId} AND user_id = ${userId}
@@ -204,10 +245,14 @@ export default {
             RETURNING *;
           `;
         } else if (type === 'wifi') {
+          const cipherWifiPass = data.password !== undefined
+              ? await encryptVaultField(data.password, masterKey)
+              : null;
+
           updated = await sql`
             UPDATE wifi_networks
             SET ssid = COALESCE(${data.ssid}, ssid),
-                password = COALESCE(${data.password}, password),
+                password = ${cipherWifiPass !== null ? cipherWifiPass : sql`password`},
                 security_type = COALESCE(${data.security_type}, security_type),
                 notes = ${data.notes !== undefined ? (data.notes || null) : sql`notes`},
                 is_pinned = COALESCE(${data.is_pinned}, is_pinned),
