@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'theme.dart';
+import 'home_screen.dart';
+import 'neon_sync_service.dart';
 
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -28,23 +30,19 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _isLoading = false);
 
       if (account != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.primaryMatcha,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            content: Row(
-              children: [
-                const Icon(LucideIcons.checkCircle2, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Welcome, ${account.displayName ?? account.email}!',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
+        // 🐘 Direct Neon Postgres Database Sync
+        await NeonSyncService.syncUser(
+          email: account.email,
+          name: account.displayName,
+          provider: 'google',
+        );
+
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => HomeScreen(
+              userName: account.displayName ?? 'Jhon Emil',
+              userEmail: account.email,
             ),
           ),
         );
@@ -87,25 +85,25 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const Spacer(flex: 2),
 
-              // 🍵 Branding Container (Matcha Padlock)
+              // 🍵 Branding Container (Matcha Padlock with Pistachio & Sage borders)
               Container(
-                width: 104,
-                height: 104,
+                width: 110,
+                height: 110,
                 decoration: BoxDecoration(
                   color: AppColors.cardSurface,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: AppColors.borderMuted, width: 1.5),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: AppColors.pistachioMint, width: 2),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primaryMatcha.withValues(alpha: 0.08),
-                      blurRadius: 30,
-                      offset: const Offset(0, 10),
+                      color: AppColors.primaryMatcha.withValues(alpha: 0.12),
+                      blurRadius: 32,
+                      offset: const Offset(0, 12),
                     ),
                   ],
                 ),
                 padding: const EdgeInsets.all(12),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(20),
                   child: Image.asset(
                     'assets/icon/app_icon.png',
                     fit: BoxFit.cover,
@@ -114,23 +112,40 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 28),
 
-              // Title & Subtitle
+              // Title & Subtitle with high-contrast forest text
               const Text(
                 'PassKeep',
                 style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 34,
+                  fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,
                   letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.pistachioMint.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Your serene, high-security personal vault',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: AppColors.primaryMatcha,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               const Text(
-                'Your serene, high-security personal vault\nfor life\'s passwords & secrets.',
+                'Safeguard life\'s passwords, accounts & sensitive secrets.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 15,
-                  height: 1.45,
+                  fontSize: 14,
+                  height: 1.4,
                   color: AppColors.textMuted,
                   fontWeight: FontWeight.w400,
                 ),
@@ -138,21 +153,22 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const Spacer(flex: 3),
 
-              // 🚀 Google-Only 1-Tap Login Card
+              // 🚀 Google-Only 1-Tap Login Card (Pill shape with Sage Matcha border & Deep Matcha accents)
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 width: double.infinity,
                 height: 58,
-                child: OutlinedButton(
+                child: ElevatedButton(
                   onPressed: _isLoading ? null : _handleGoogleSignIn,
-                  style: OutlinedButton.styleFrom(
+                  style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.cardSurface,
-                    side: const BorderSide(color: AppColors.borderMuted, width: 1.5),
+                    foregroundColor: AppColors.textPrimary,
+                    side: const BorderSide(color: AppColors.sageMatcha, width: 1.6),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(29),
                     ),
-                    elevation: 1,
-                    shadowColor: Colors.black.withValues(alpha: 0.05),
+                    elevation: 2,
+                    shadowColor: AppColors.primaryMatcha.withValues(alpha: 0.15),
                   ),
                   child: _isLoading
                       ? const SizedBox(
@@ -170,15 +186,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             // Clean Google 'G' Mark
                             Container(
-                              width: 24,
-                              height: 24,
-                              decoration: const BoxDecoration(shape: BoxShape.circle),
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: AppColors.pistachioMint.withValues(alpha: 0.25),
+                                shape: BoxShape.circle,
+                              ),
                               child: const Center(
                                 child: Text(
                                   'G',
                                   style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
                                     color: Color(0xFF4285F4),
                                     fontFamily: 'sans-serif',
                                   ),
@@ -190,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               'Continue with Google',
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                                 color: AppColors.textPrimary,
                                 letterSpacing: -0.2,
                               ),
@@ -200,27 +219,35 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 26),
 
-              // Trust & Security Badge
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    LucideIcons.shieldCheck,
-                    size: 16,
-                    color: AppColors.sageMatcha,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Protected by Neon Vault Encryption',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textMuted.withValues(alpha: 0.9),
+              // Trust & Security Badge (Pistachio Pill Container)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.pistachioMint.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.borderMuted, width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      LucideIcons.shieldCheck,
+                      size: 16,
+                      color: AppColors.primaryMatcha,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Text(
+                      'Protected by Neon Vault Encryption',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryMatcha.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
               const Spacer(flex: 1),

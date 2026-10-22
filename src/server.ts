@@ -16,6 +16,31 @@ app.get("/health", (req: Request, res: Response) => {
   });
 });
 
+// User Sync / Upsert for Google & OAuth Users
+app.post("/api/users/sync", async (req: Request, res: Response) => {
+  try {
+    const { email, name, provider } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: "Email is required" });
+    }
+
+    const rows = await sql`
+      INSERT INTO users (email, name, provider, updated_at)
+      VALUES (${email}, ${name || 'User'}, ${provider || 'google'}, NOW())
+      ON CONFLICT (email) 
+      DO UPDATE SET 
+        name = COALESCE(EXCLUDED.name, users.name),
+        updated_at = NOW()
+      RETURNING *;
+    `;
+
+    res.json({ success: true, user: rows[0] });
+  } catch (error: any) {
+    console.error("User sync error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 1. Neon Postgres: initialize table if not exists & list credentials
 app.get("/api/init-db", async (req: Request, res: Response) => {
   try {
