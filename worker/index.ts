@@ -74,10 +74,10 @@ export default {
         }
 
         const [passwords, secrets, contacts, birthdays] = await Promise.all([
-          sql`SELECT * FROM credentials WHERE user_id = ${targetUserId} ORDER BY created_at DESC;`,
-          sql`SELECT * FROM secure_notes WHERE user_id = ${targetUserId} ORDER BY created_at DESC;`,
-          sql`SELECT * FROM emergency_contacts WHERE user_id = ${targetUserId} ORDER BY created_at DESC;`,
-          sql`SELECT * FROM family_members WHERE user_id = ${targetUserId} ORDER BY birthdate ASC;`,
+          sql`SELECT * FROM credentials WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, created_at DESC;`,
+          sql`SELECT * FROM secure_notes WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, created_at DESC;`,
+          sql`SELECT * FROM emergency_contacts WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, created_at DESC;`,
+          sql`SELECT * FROM family_members WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, birthdate ASC;`,
         ]);
 
         return Response.json({
@@ -106,26 +106,26 @@ export default {
         let inserted;
         if (type === 'password') {
           inserted = await sql`
-            INSERT INTO credentials (user_id, title, username_or_email, encrypted_password, notes)
-            VALUES (${userId}, ${data.title}, ${data.username_or_email}, ${data.password}, ${data.notes || null})
+            INSERT INTO credentials (user_id, title, username_or_email, encrypted_password, notes, is_pinned)
+            VALUES (${userId}, ${data.title}, ${data.username_or_email}, ${data.password}, ${data.notes || null}, ${data.is_pinned ?? false})
             RETURNING *;
           `;
         } else if (type === 'secret') {
           inserted = await sql`
-            INSERT INTO secure_notes (user_id, title, content)
-            VALUES (${userId}, ${data.title}, ${data.content})
+            INSERT INTO secure_notes (user_id, title, content, is_pinned)
+            VALUES (${userId}, ${data.title}, ${data.content}, ${data.is_pinned ?? false})
             RETURNING *;
           `;
         } else if (type === 'contact') {
           inserted = await sql`
-            INSERT INTO emergency_contacts (user_id, name, phone_number, relationship, notes)
-            VALUES (${userId}, ${data.name}, ${data.phone_number}, ${data.relationship || 'General'}, ${data.notes || null})
+            INSERT INTO emergency_contacts (user_id, name, phone_number, relationship, notes, is_pinned)
+            VALUES (${userId}, ${data.name}, ${data.phone_number}, ${data.relationship || 'General'}, ${data.notes || null}, ${data.is_pinned ?? false})
             RETURNING *;
           `;
         } else if (type === 'birthday') {
           inserted = await sql`
-            INSERT INTO family_members (user_id, name, relationship, birthdate, notes)
-            VALUES (${userId}, ${data.name}, ${data.relationship || 'Family'}, ${data.birthdate}, ${data.notes || null})
+            INSERT INTO family_members (user_id, name, relationship, birthdate, notes, is_pinned)
+            VALUES (${userId}, ${data.name}, ${data.relationship || 'Family'}, ${data.birthdate}, ${data.notes || null}, ${data.is_pinned ?? false})
             RETURNING *;
           `;
         } else {
@@ -152,10 +152,11 @@ export default {
         if (type === 'password') {
           updated = await sql`
             UPDATE credentials
-            SET title = ${data.title},
-                username_or_email = ${data.username_or_email},
-                encrypted_password = ${data.password},
-                notes = ${data.notes || null},
+            SET title = COALESCE(${data.title}, title),
+                username_or_email = COALESCE(${data.username_or_email}, username_or_email),
+                encrypted_password = COALESCE(${data.password}, encrypted_password),
+                notes = ${data.notes !== undefined ? (data.notes || null) : sql`notes`},
+                is_pinned = COALESCE(${data.is_pinned}, is_pinned),
                 updated_at = NOW()
             WHERE id = ${itemId} AND user_id = ${userId}
             RETURNING *;
@@ -163,8 +164,9 @@ export default {
         } else if (type === 'secret') {
           updated = await sql`
             UPDATE secure_notes
-            SET title = ${data.title},
-                content = ${data.content},
+            SET title = COALESCE(${data.title}, title),
+                content = COALESCE(${data.content}, content),
+                is_pinned = COALESCE(${data.is_pinned}, is_pinned),
                 updated_at = NOW()
             WHERE id = ${itemId} AND user_id = ${userId}
             RETURNING *;
@@ -172,10 +174,11 @@ export default {
         } else if (type === 'contact') {
           updated = await sql`
             UPDATE emergency_contacts
-            SET name = ${data.name},
-                phone_number = ${data.phone_number},
-                relationship = ${data.relationship || 'General'},
-                notes = ${data.notes || null},
+            SET name = COALESCE(${data.name}, name),
+                phone_number = COALESCE(${data.phone_number}, phone_number),
+                relationship = COALESCE(${data.relationship}, relationship),
+                notes = ${data.notes !== undefined ? (data.notes || null) : sql`notes`},
+                is_pinned = COALESCE(${data.is_pinned}, is_pinned),
                 updated_at = NOW()
             WHERE id = ${itemId} AND user_id = ${userId}
             RETURNING *;
@@ -183,10 +186,11 @@ export default {
         } else if (type === 'birthday') {
           updated = await sql`
             UPDATE family_members
-            SET name = ${data.name},
-                relationship = ${data.relationship || 'Family'},
-                birthdate = ${data.birthdate},
-                notes = ${data.notes || null},
+            SET name = COALESCE(${data.name}, name),
+                relationship = COALESCE(${data.relationship}, relationship),
+                birthdate = COALESCE(${data.birthdate}, birthdate),
+                notes = ${data.notes !== undefined ? (data.notes || null) : sql`notes`},
+                is_pinned = COALESCE(${data.is_pinned}, is_pinned),
                 updated_at = NOW()
             WHERE id = ${itemId} AND user_id = ${userId}
             RETURNING *;
