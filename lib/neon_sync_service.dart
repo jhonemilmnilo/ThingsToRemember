@@ -2,9 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class NeonSyncService {
-  // 🌐 Live 24/7 Cloudflare Edge Worker connected to Neon Postgres
-  static const String _baseUrl =
-      'https://passkeep-api.nilojhonemil1.workers.dev';
+  // 🌐 Base API URL (Configurable via --dart-define=PASSKEEP_API_URL or defaults to Cloudflare Edge)
+  static const String _baseUrl = String.fromEnvironment(
+    'PASSKEEP_API_URL',
+    defaultValue: 'https://passkeep-api.nilojhonemil1.workers.dev',
+  );
 
   // 🛡️ In-memory Cryptographic Session Token (Bearer Auth)
   static String? _sessionToken;

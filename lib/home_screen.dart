@@ -84,6 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _handleLogout() async {
+    NeonSyncService.clearSession();
     try {
       await GoogleSignIn().signOut();
     } catch (_) {}
