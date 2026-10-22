@@ -31,9 +31,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _contacts = [];
   List<dynamic> _birthdays = [];
 
-  // Toggle tracking for revealing hidden passwords
-  final Set<String> _revealedPasswordIds = {};
-
   // Clean Typography-Only Tabs (No Icons)
   final List<Map<String, String>> _tabs = [
     {'type': 'password', 'title': 'Passwords'},
@@ -530,47 +527,31 @@ class _HomeScreenState extends State<HomeScreen> {
         final item = items[index];
 
         if (_selectedTabIndex == 0) {
-          final String itemId = item['id']?.toString() ?? index.toString();
-          final bool isRevealed = _revealedPasswordIds.contains(itemId);
-          final String rawPassword = item['encrypted_password'] ?? '';
-
           return _buildItemCard(
             title: item['title'] ?? 'Account',
             subtitle: item['username_or_email'] ?? '',
-            badge: 'Login',
             noteContent: item['notes'],
-            passwordContent: rawPassword,
-            isPasswordRevealed: isRevealed,
-            onTogglePassword: () {
-              setState(() {
-                if (isRevealed) {
-                  _revealedPasswordIds.remove(itemId);
-                } else {
-                  _revealedPasswordIds.add(itemId);
-                }
-              });
-            },
-            copyContent: rawPassword,
+            onTap: () => _openItemDetail(item, 'password'),
           );
         } else if (_selectedTabIndex == 1) {
           return _buildItemCard(
             title: item['title'] ?? 'Secret Note',
             subtitle: item['content'] ?? '',
-            badge: 'Encrypted',
-            copyContent: item['content'] ?? '',
+            onTap: () => _openItemDetail(item, 'secret'),
           );
         } else if (_selectedTabIndex == 2) {
           return _buildItemCard(
             title: item['name'] ?? 'Contact',
             subtitle: item['phone_number'] ?? '',
-            badge: item['relationship'] ?? 'General',
-            copyContent: item['phone_number'] ?? '',
+            noteContent: item['notes'] ?? item['relationship'],
+            onTap: () => _openItemDetail(item, 'contact'),
           );
         } else {
           return _buildItemCard(
             title: item['name'] ?? 'Family',
             subtitle: 'Born: ${item['birthdate']?.toString().split('T').first ?? ''}',
-            badge: item['relationship'] ?? 'Family',
+            noteContent: item['relationship'],
+            onTap: () => _openItemDetail(item, 'birthday'),
           );
         }
       },
@@ -580,12 +561,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildItemCard({
     required String title,
     required String subtitle,
-    required String badge,
     String? noteContent,
-    String? passwordContent,
-    bool isPasswordRevealed = false,
-    VoidCallback? onTogglePassword,
-    String? copyContent,
+    required VoidCallback onTap,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -594,17 +571,23 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.borderMuted, width: 1.2),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          splashColor: AppColors.primaryMatcha.withValues(alpha: 0.08),
+          highlightColor: AppColors.primaryMatcha.withValues(alpha: 0.04),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
                         title,
                         style: const TextStyle(
                           fontSize: 15,
@@ -613,124 +596,268 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.pistachioMint.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(10),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      child: Text(
-                        badge,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primaryMatcha,
+                      if (noteContent != null && noteContent.trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'Note: ${noteContent.trim()}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.sageMatcha,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (noteContent != null && noteContent.trim().isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'Note: ${noteContent.trim()}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      color: AppColors.sageMatcha,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                      ],
+                    ],
                   ),
-                ],
-                if (passwordContent != null) ...[
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.oatMilkBg,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      isPasswordRevealed
-                          ? passwordContent
-                          : ('•' * (passwordContent.isEmpty ? 8 : passwordContent.length.clamp(8, 14))),
-                      style: TextStyle(
-                        fontSize: isPasswordRevealed ? 12.5 : 15,
-                        letterSpacing: isPasswordRevealed ? 0.2 : 2.0,
-                        fontWeight: FontWeight.w700,
-                        color: isPasswordRevealed ? AppColors.primaryMatcha : AppColors.textMuted,
-                        fontFamily: isPasswordRevealed ? null : 'monospace',
-                      ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.oatMilkBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.borderMuted),
+                  ),
+                  child: const Text(
+                    'View →',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryMatcha,
                     ),
                   ),
-                ],
+                ),
               ],
             ),
           ),
-          if (onTogglePassword != null) ...[
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: onTogglePassword,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isPasswordRevealed
-                      ? AppColors.primaryMatcha.withValues(alpha: 0.15)
-                      : AppColors.oatMilkBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isPasswordRevealed ? AppColors.primaryMatcha : AppColors.borderMuted,
-                  ),
-                ),
-                child: Text(
-                  isPasswordRevealed ? 'Hide' : 'Show',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: isPasswordRevealed ? AppColors.primaryMatcha : AppColors.textPrimary,
-                  ),
-                ),
-              ),
-            ),
-          ],
-          if (copyContent != null) ...[
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    backgroundColor: AppColors.primaryMatcha,
-                    behavior: SnackBarBehavior.floating,
-                    duration: Duration(seconds: 1),
-                    content: Text('Copied to clipboard!'),
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.oatMilkBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.borderMuted),
-                ),
-                child: const Text(
-                  'Copy',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primaryMatcha),
-                ),
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
+    );
+  }
+  void _openItemDetail(dynamic item, String type) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        bool showSecretPassword = false;
+
+        return StatefulBuilder(
+          builder: (context, setDetailState) {
+            String title = '';
+            List<Map<String, String>> fields = [];
+
+            if (type == 'password') {
+              title = item['title'] ?? 'Password Detail';
+              fields = [
+                {'label': 'Service / Title', 'value': item['title'] ?? ''},
+                {'label': 'Username or Email', 'value': item['username_or_email'] ?? ''},
+                {'label': 'Password', 'value': item['encrypted_password'] ?? '', 'isPassword': 'true'},
+                if (item['notes'] != null && item['notes'].toString().trim().isNotEmpty)
+                  {'label': 'Notes / Hint', 'value': item['notes'].toString()},
+              ];
+            } else if (type == 'secret') {
+              title = item['title'] ?? 'Secret Note';
+              fields = [
+                {'label': 'Title', 'value': item['title'] ?? ''},
+                {'label': 'Content', 'value': item['content'] ?? ''},
+              ];
+            } else if (type == 'contact') {
+              title = item['name'] ?? 'Contact';
+              fields = [
+                {'label': 'Name', 'value': item['name'] ?? ''},
+                {'label': 'Phone Number', 'value': item['phone_number'] ?? ''},
+                {'label': 'Relationship', 'value': item['relationship'] ?? 'General'},
+                if (item['notes'] != null && item['notes'].toString().trim().isNotEmpty)
+                  {'label': 'Notes', 'value': item['notes'].toString()},
+              ];
+            } else {
+              title = item['name'] ?? 'Family Birthday';
+              fields = [
+                {'label': 'Name', 'value': item['name'] ?? ''},
+                {'label': 'Birthdate', 'value': item['birthdate']?.toString().split('T').first ?? ''},
+                {'label': 'Relationship', 'value': item['relationship'] ?? 'Family'},
+              ];
+            }
+
+            return Container(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+              decoration: const BoxDecoration(
+                color: AppColors.cardSurface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.borderMuted,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.pop(ctx),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.oatMilkBg,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.borderMuted),
+                              ),
+                              child: const Text(
+                                'Close',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      ...fields.map((field) {
+                        final bool isPassField = field['isPassword'] == 'true';
+                        final String val = field['value'] ?? '';
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 14),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.oatMilkBg,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.borderMuted),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                field['label']!.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  letterSpacing: 0.8,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.sageMatcha,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      isPassField
+                                          ? (showSecretPassword ? val : ('•' * (val.isEmpty ? 8 : val.length.clamp(8, 14))))
+                                          : val,
+                                      style: TextStyle(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimary,
+                                        letterSpacing: (isPassField && !showSecretPassword) ? 2.0 : 0.2,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isPassField) ...[
+                                    const SizedBox(width: 8),
+                                    GestureDetector(
+                                      onTap: () {
+                                        setDetailState(() {
+                                          showSecretPassword = !showSecretPassword;
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.cardSurface,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: AppColors.borderMuted),
+                                        ),
+                                        child: Text(
+                                          showSecretPassword ? 'Hide' : 'Show',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.primaryMatcha,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          backgroundColor: AppColors.primaryMatcha,
+                                          behavior: SnackBarBehavior.floating,
+                                          duration: const Duration(seconds: 1),
+                                          content: Text('Copied ${field['label']} to clipboard!'),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.cardSurface,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: AppColors.borderMuted),
+                                      ),
+                                      child: const Text(
+                                        'Copy',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.primaryMatcha,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
