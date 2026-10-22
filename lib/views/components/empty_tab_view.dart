@@ -26,7 +26,7 @@ class EmptyTabView extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Text(
-                'VAULT STATUS',
+                'STATUS',
                 style: TextStyle(
                   fontSize: 11,
                   letterSpacing: 1.2,
@@ -37,7 +37,7 @@ class EmptyTabView extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Your $tabTitle Vault is Empty',
+              'No $tabTitle Yet',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 20,
@@ -62,7 +62,7 @@ class EmptyTabView extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             const Text(
-              'End-to-End Encrypted Vault',
+              'End-to-End Encrypted',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,

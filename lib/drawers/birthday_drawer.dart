@@ -11,11 +11,9 @@ class BirthdayDrawer {
     required dynamic item,
     required String userId,
     required VoidCallback onSaved,
-    required VoidCallback onPinnedToggled,
   }) {
     bool isEditing = false;
     bool isSaving = false;
-    bool isPinned = item['is_pinned'] == true;
 
     final nameCtrl = TextEditingController(text: item['name'] ?? '');
     final dateCtrl =
@@ -114,9 +112,110 @@ class BirthdayDrawer {
                           label: 'Family Member Name',
                         ),
                         const SizedBox(height: 12),
-                        DrawerComponents.drawerInput(
-                          controller: dateCtrl,
-                          label: 'Birthdate (YYYY-MM-DD)',
+                        GestureDetector(
+                          onTap: () async {
+                            DateTime initialDate = DateTime.tryParse(dateCtrl.text.trim()) ?? DateTime(1998, 1, 1);
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: initialDate,
+                              firstDate: DateTime(1900),
+                              lastDate: DateTime.now(),
+                              initialDatePickerMode: DatePickerMode.year,
+                              initialEntryMode: DatePickerEntryMode.calendarOnly,
+                              helpText: 'SELECT BIRTHDATE',
+                              cancelText: 'CANCEL',
+                              confirmText: 'SELECT',
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    dialogTheme: DialogThemeData(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(24),
+                                      ),
+                                      backgroundColor: AppColors.oatMilkBg,
+                                    ),
+                                    datePickerTheme: DatePickerThemeData(
+                                      backgroundColor: AppColors.cardSurface,
+                                      headerBackgroundColor: AppColors.primaryMatcha,
+                                      headerForegroundColor: Colors.white,
+                                      headerHeadlineStyle: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(24),
+                                      ),
+                                      dayStyle: const TextStyle(fontWeight: FontWeight.w600),
+                                      todayBorder: const BorderSide(color: AppColors.primaryMatcha, width: 1.5),
+                                      todayForegroundColor: const WidgetStatePropertyAll(AppColors.primaryMatcha),
+                                      dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+                                        if (states.contains(WidgetState.selected)) return Colors.white;
+                                        return AppColors.textPrimary;
+                                      }),
+                                      dayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+                                        if (states.contains(WidgetState.selected)) return AppColors.primaryMatcha;
+                                        return null;
+                                      }),
+                                      yearForegroundColor: WidgetStateProperty.resolveWith((states) {
+                                        if (states.contains(WidgetState.selected)) return Colors.white;
+                                        return AppColors.textPrimary;
+                                      }),
+                                      yearBackgroundColor: WidgetStateProperty.resolveWith((states) {
+                                        if (states.contains(WidgetState.selected)) return AppColors.primaryMatcha;
+                                        return null;
+                                      }),
+                                    ),
+                                    colorScheme: const ColorScheme.light(
+                                      primary: AppColors.primaryMatcha,
+                                      onPrimary: Colors.white,
+                                      surface: AppColors.cardSurface,
+                                      onSurface: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+
+                            if (picked != null) {
+                              final formatted =
+                                  '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+                              setDrawerState(() {
+                                dateCtrl.text = formatted;
+                              });
+                            }
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: AppColors.cardSurface,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: AppColors.borderMuted, width: 1.2),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  dateCtrl.text.isEmpty
+                                      ? 'Select Birthdate (Tap to Pick)'
+                                      : 'Birthdate: ${dateCtrl.text}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: dateCtrl.text.isEmpty
+                                        ? AppColors.textMuted
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.calendar_month_rounded,
+                                  size: 20,
+                                  color: AppColors.primaryMatcha,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 12),
                         DrawerComponents.drawerInput(
@@ -125,10 +224,6 @@ class BirthdayDrawer {
                         ),
                         const SizedBox(height: 14),
 
-                        DrawerComponents.pinToggleRow(
-                          isPinned: isPinned,
-                          onChanged: (val) => setDrawerState(() => isPinned = val),
-                        ),
                         const SizedBox(height: 18),
 
                         SizedBox(
@@ -148,13 +243,11 @@ class BirthdayDrawer {
                                         'name': nameCtrl.text.trim(),
                                         'birthdate': dateCtrl.text.trim(),
                                         'relationship': relCtrl.text.trim(),
-                                        'is_pinned': isPinned,
                                       },
                                     );
 
                                     if (!context.mounted) return;
                                     if (updated) {
-                                      item['is_pinned'] = isPinned;
                                       Navigator.pop(ctx);
                                       onSaved();
                                     } else {
@@ -187,23 +280,6 @@ class BirthdayDrawer {
                           label: 'RELATIONSHIP',
                           value: item['relationship'] ?? 'Family',
                           canCopy: false,
-                        ),
-                        const SizedBox(height: 6),
-                        DrawerComponents.pinToggleRow(
-                          isPinned: isPinned,
-                          onChanged: (val) async {
-                            setDrawerState(() {
-                              isPinned = val;
-                              item['is_pinned'] = val;
-                            });
-                            onPinnedToggled();
-                            await NeonSyncService.updateVaultItem(
-                              userId: userId,
-                              itemId: item['id'].toString(),
-                              type: 'birthday',
-                              data: {'is_pinned': val},
-                            );
-                          },
                         ),
                       ],
                     ],

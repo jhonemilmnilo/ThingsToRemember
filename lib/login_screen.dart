@@ -134,7 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
-                  'Your serene, high-security personal vault',
+                  'Your serene, high-security space',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13.5,
@@ -243,7 +243,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Protected by Neon Vault Encryption',
+                      'Protected by End-to-End Encryption',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,

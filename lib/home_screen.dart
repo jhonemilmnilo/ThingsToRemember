@@ -317,7 +317,6 @@ class _HomeScreenState extends State<HomeScreen> {
           items: _birthdays,
           userId: _activeUserId,
           onSaved: () => _reSortListAndNotify(_birthdays, 'Birthday updated successfully!'),
-          onPinnedToggled: () => _reSortListAndNotify(_birthdays, null),
           onDelete: (item) => _confirmDeleteItem(
             title: item['name'] ?? 'Birthday',
             itemTypeLabel: 'Birthday',

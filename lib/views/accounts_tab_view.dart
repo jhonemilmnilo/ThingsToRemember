@@ -38,7 +38,7 @@ class _AccountsTabViewState extends State<AccountsTabView> {
       return const EmptyTabView(
         tabTitle: 'Accounts',
         explanation:
-            'No saved passwords or logins yet. Keep all your streaming, bank & work logins in one secure vault.',
+            'No saved passwords or logins yet. Keep all your streaming, bank & work logins in one secure place.',
       );
     }
 
