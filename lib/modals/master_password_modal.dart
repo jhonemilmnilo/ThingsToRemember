@@ -29,6 +29,7 @@ class _MasterPasswordModalState extends State<MasterPasswordModal> {
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _isSubmitting = false;
+  bool _isLocked = false;
   String? _errorMessage;
 
   @override
@@ -39,6 +40,8 @@ class _MasterPasswordModalState extends State<MasterPasswordModal> {
   }
 
   void _handleSubmit() async {
+    if (_isLocked) return;
+
     final password = _passwordController.text.trim();
 
     if (password.isEmpty) {
@@ -81,8 +84,8 @@ class _MasterPasswordModalState extends State<MasterPasswordModal> {
         setState(() => _errorMessage = 'Failed to setup password. Please try again.');
       }
     } else {
-      // Verify Master Password
-      final isValid = await NeonSyncService.verifyMasterPassword(
+      // Verify Master Password with Lockout Protection
+      final result = await NeonSyncService.verifyMasterPassword(
         email: widget.email,
         password: password,
       );
@@ -90,11 +93,14 @@ class _MasterPasswordModalState extends State<MasterPasswordModal> {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
 
-      if (isValid) {
+      if (result['verified'] == true) {
         Navigator.of(context).pop();
         widget.onAuthenticated();
       } else {
-        setState(() => _errorMessage = 'Incorrect password. Access denied.');
+        setState(() {
+          _isLocked = result['locked'] == true;
+          _errorMessage = result['error'] ?? 'Incorrect password. Access denied.';
+        });
       }
     }
   }
@@ -201,11 +207,12 @@ class _MasterPasswordModalState extends State<MasterPasswordModal> {
                   child: TextField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
+                    enabled: !_isLocked,
                     autofocus: true,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: _isLocked ? AppColors.textMuted : AppColors.textPrimary,
                     ),
                     decoration: InputDecoration(
                       hintText: widget.isSetupMode ? 'Create Password / PIN' : 'Enter Password',
@@ -239,6 +246,7 @@ class _MasterPasswordModalState extends State<MasterPasswordModal> {
                     child: TextField(
                       controller: _confirmController,
                       obscureText: _obscureConfirm,
+                      enabled: !_isLocked,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -269,9 +277,9 @@ class _MasterPasswordModalState extends State<MasterPasswordModal> {
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: _isSubmitting ? null : _handleSubmit,
+                    onPressed: (_isSubmitting || _isLocked) ? null : _handleSubmit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryMatcha,
+                      backgroundColor: _isLocked ? AppColors.borderMuted : AppColors.primaryMatcha,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(

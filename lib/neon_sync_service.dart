@@ -88,7 +88,7 @@ class NeonSyncService {
   }
 
   /// Verify user's Master Vault Password / PIN & receive Bearer Token
-  static Future<bool> verifyMasterPassword({
+  static Future<Map<String, dynamic>> verifyMasterPassword({
     required String email,
     required String password,
   }) async {
@@ -102,18 +102,27 @@ class NeonSyncService {
         }),
       );
 
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
-        if (decoded['success'] == true && decoded['verified'] == true) {
-          if (decoded['sessionToken'] != null) {
-            _sessionToken = decoded['sessionToken'];
-          }
-          return true;
+      final decoded = jsonDecode(response.body);
+      if (response.statusCode == 200 && decoded['success'] == true && decoded['verified'] == true) {
+        if (decoded['sessionToken'] != null) {
+          _sessionToken = decoded['sessionToken'];
         }
+        return {'success': true, 'verified': true};
       }
-      return false;
-    } catch (_) {
-      return false;
+
+      return {
+        'success': false,
+        'verified': false,
+        'locked': decoded['locked'] == true || response.statusCode == 423,
+        'error': decoded['error'] ?? 'Incorrect password.',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'verified': false,
+        'locked': false,
+        'error': 'Network connection error. Please try again.',
+      };
     }
   }
 

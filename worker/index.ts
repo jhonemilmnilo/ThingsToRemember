@@ -66,10 +66,32 @@ export default {
           DO UPDATE SET 
             name = COALESCE(EXCLUDED.name, users.name),
             updated_at = NOW()
-          RETURNING id, email, name, provider, COALESCE(has_master_password, FALSE) as has_master_password, created_at;
+          RETURNING id, email, name, provider, COALESCE(has_master_password, FALSE) as has_master_password, failed_attempts, lockout_until, created_at;
         `;
 
-        return Response.json({ success: true, user: rows[0] }, { headers: corsHeaders });
+        const user = rows[0];
+        const now = new Date();
+
+        // If lockout has expired, automatically reset to 0 in sync as well
+        if (user.lockout_until && now >= new Date(user.lockout_until)) {
+          await sql`
+            UPDATE users 
+            SET failed_attempts = 0, lockout_until = NULL, updated_at = NOW() 
+            WHERE id = ${user.id};
+          `;
+          user.failed_attempts = 0;
+          user.lockout_until = null;
+        }
+
+        const isCurrentlyLocked = user.lockout_until && now < new Date(user.lockout_until);
+
+        return Response.json({
+          success: true,
+          user: {
+            ...user,
+            is_locked: isCurrentlyLocked,
+          },
+        }, { headers: corsHeaders });
       } catch (err: any) {
         return Response.json({ success: false, error: err.message }, { status: 500, headers: corsHeaders });
       }
@@ -125,7 +147,7 @@ export default {
         }
 
         const rows = await sql`
-          SELECT id, email, master_password_hash, password_salt, has_master_password
+          SELECT id, email, master_password_hash, password_salt, has_master_password, failed_attempts, lockout_until
           FROM users
           WHERE email = ${email};
         `;
@@ -139,10 +161,74 @@ export default {
           return Response.json({ success: false, error: 'No master password configured for this user' }, { status: 400, headers: corsHeaders });
         }
 
-        const isValid = await verifyPassword(password, user.master_password_hash, user.password_salt);
-        if (!isValid) {
-          return Response.json({ success: false, verified: false, error: 'Incorrect Master Password' }, { status: 401, headers: corsHeaders });
+        const now = new Date();
+
+        // 1. CHECK LOCKOUT EXPIRY & ACTIVE LOCK
+        if (user.lockout_until) {
+          const lockoutDate = new Date(user.lockout_until);
+          if (now < lockoutDate) {
+            // Still within the 1-hour lockout window -> block immediately
+            return Response.json({
+              success: false,
+              locked: true,
+              error: 'Account locked due to 5 failed attempts. Please try again after 1 hour.',
+            }, { status: 423, headers: corsHeaders });
+          } else {
+            // 1 Hour has passed! Auto-reset the counter for a fresh set of 5 tries
+            user.failed_attempts = 0;
+            user.lockout_until = null;
+            await sql`
+              UPDATE users 
+              SET failed_attempts = 0, lockout_until = NULL, updated_at = NOW() 
+              WHERE id = ${user.id};
+            `;
+          }
         }
+
+        // 2. VERIFY PASSWORD HASH
+        const isValid = await verifyPassword(password, user.master_password_hash, user.password_salt);
+
+        if (!isValid) {
+          const currentFailed = Number(user.failed_attempts || 0);
+          const newAttempts = currentFailed + 1;
+
+          if (newAttempts >= 5) {
+            // 💥 Strike 5 reached! Lock account for exactly 1 hour
+            const lockoutUntil = new Date(now.getTime() + 60 * 60 * 1000);
+            await sql`
+              UPDATE users 
+              SET failed_attempts = 5, lockout_until = ${lockoutUntil.toISOString()}, updated_at = NOW() 
+              WHERE id = ${user.id};
+            `;
+
+            return Response.json({
+              success: false,
+              locked: true,
+              error: 'Account locked due to 5 failed attempts. Please try again after 1 hour.',
+            }, { status: 423, headers: corsHeaders });
+          } else {
+            // Strikes 1 to 4: Increment failed_attempts
+            await sql`
+              UPDATE users 
+              SET failed_attempts = ${newAttempts}, updated_at = NOW() 
+              WHERE id = ${user.id};
+            `;
+
+            return Response.json({
+              success: false,
+              verified: false,
+              locked: false,
+              error: 'Incorrect password.',
+            }, { status: 401, headers: corsHeaders });
+          }
+        }
+
+        // ✅ 3. SUCCESSFUL LOGIN: Reset counter and lockout back to 0
+        await sql`
+          UPDATE users 
+          SET failed_attempts = 0, lockout_until = NULL, updated_at = NOW() 
+          WHERE id = ${user.id};
+        `;
 
         // Issue cryptographically signed token valid for 7 days
         const sessionToken = await issueSessionToken(user.id, user.email, env.AES_VAULT_MASTER_KEY);
