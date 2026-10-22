@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'theme.dart';
 import 'home_screen.dart';
 import 'neon_sync_service.dart';
+import 'modals/master_password_modal.dart';
 
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -41,13 +42,28 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => HomeScreen(
-              userName: account.displayName ?? 'Jhon Emil',
-              userEmail: account.email,
-              userId: syncedUser?['id'],
-            ),
+
+        final bool hasMasterPassword = syncedUser?['has_master_password'] == true;
+
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) => MasterPasswordModal(
+            email: account.email,
+            userName: account.displayName ?? 'Jhon Emil',
+            userId: syncedUser?['id'],
+            isSetupMode: !hasMasterPassword,
+            onAuthenticated: () {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => HomeScreen(
+                    userName: account.displayName ?? 'Jhon Emil',
+                    userEmail: account.email,
+                    userId: syncedUser?['id'],
+                  ),
+                ),
+              );
+            },
           ),
         );
       }

@@ -1,5 +1,13 @@
 import { neon } from '@neondatabase/serverless';
-import { encryptVaultField, decryptVaultField } from './crypto';
+import {
+  encryptVaultField,
+  decryptVaultField,
+  hashPassword,
+  verifyPassword,
+  issueSessionToken,
+  verifySessionToken,
+  SessionPayload,
+} from './crypto';
 
 export interface Env {
   DATABASE_URL: string;
@@ -22,6 +30,16 @@ export default {
     }
 
     const sql = neon(env.DATABASE_URL);
+
+    // Reusable Bearer Token Verification Helper
+    async function getAuthenticatedSession(): Promise<SessionPayload | null> {
+      const authHeader = request.headers.get('Authorization') || request.headers.get('authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return null;
+      }
+      const token = authHeader.substring(7).trim();
+      return await verifySessionToken(token, env.AES_VAULT_MASTER_KEY);
+    }
 
     // Health check
     if (url.pathname === '/health' || url.pathname === '/') {
@@ -48,7 +66,7 @@ export default {
           DO UPDATE SET 
             name = COALESCE(EXCLUDED.name, users.name),
             updated_at = NOW()
-          RETURNING id, email, name, provider, created_at;
+          RETURNING id, email, name, provider, COALESCE(has_master_password, FALSE) as has_master_password, created_at;
         `;
 
         return Response.json({ success: true, user: rows[0] }, { headers: corsHeaders });
@@ -57,23 +75,100 @@ export default {
       }
     }
 
-    // 2. Fetch all vault items for a user
+    // 1.1 Set / Register Master Password -> Issues signed session token upon setup
+    if (url.pathname === '/api/users/set-password' && request.method === 'POST') {
+      try {
+        const body: any = await request.json();
+        const { email, password } = body;
+
+        if (!email || !password || typeof password !== 'string' || password.length < 4) {
+          return Response.json(
+            { success: false, error: 'Valid email and password (min 4 characters) are required' },
+            { status: 400, headers: corsHeaders }
+          );
+        }
+
+        const { hashHex, saltHex } = await hashPassword(password);
+
+        const updated = await sql`
+          UPDATE users
+          SET 
+            master_password_hash = ${hashHex},
+            password_salt = ${saltHex},
+            has_master_password = TRUE,
+            updated_at = NOW()
+          WHERE email = ${email}
+          RETURNING id, email, name, has_master_password;
+        `;
+
+        if (updated.length === 0) {
+          return Response.json({ success: false, error: 'User not found' }, { status: 404, headers: corsHeaders });
+        }
+
+        const user = updated[0];
+        const sessionToken = await issueSessionToken(user.id, user.email, env.AES_VAULT_MASTER_KEY);
+
+        return Response.json({ success: true, user, sessionToken }, { headers: corsHeaders });
+      } catch (err: any) {
+        return Response.json({ success: false, error: err.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // 1.2 Verify Master Password -> Issues signed session token upon correct verification
+    if (url.pathname === '/api/users/verify-password' && request.method === 'POST') {
+      try {
+        const body: any = await request.json();
+        const { email, password } = body;
+
+        if (!email || !password) {
+          return Response.json({ success: false, error: 'Email and password are required' }, { status: 400, headers: corsHeaders });
+        }
+
+        const rows = await sql`
+          SELECT id, email, master_password_hash, password_salt, has_master_password
+          FROM users
+          WHERE email = ${email};
+        `;
+
+        if (rows.length === 0) {
+          return Response.json({ success: false, error: 'User not found' }, { status: 404, headers: corsHeaders });
+        }
+
+        const user = rows[0];
+        if (!user.has_master_password || !user.master_password_hash || !user.password_salt) {
+          return Response.json({ success: false, error: 'No master password configured for this user' }, { status: 400, headers: corsHeaders });
+        }
+
+        const isValid = await verifyPassword(password, user.master_password_hash, user.password_salt);
+        if (!isValid) {
+          return Response.json({ success: false, verified: false, error: 'Incorrect Master Password' }, { status: 401, headers: corsHeaders });
+        }
+
+        // Issue cryptographically signed token valid for 7 days
+        const sessionToken = await issueSessionToken(user.id, user.email, env.AES_VAULT_MASTER_KEY);
+
+        return Response.json({ success: true, verified: true, sessionToken }, { headers: corsHeaders });
+      } catch (err: any) {
+        return Response.json({ success: false, error: err.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // =========================================================================
+    // 🔒 PROTECTED VAULT ROUTES - STRICT BEARER SESSION AUTHENTICATION REQUIRED
+    // =========================================================================
+
+    // 2. Fetch all vault items for an authenticated user
     if (url.pathname === '/api/vault/items' && request.method === 'GET') {
       try {
-        const userId = url.searchParams.get('userId');
-        const email = url.searchParams.get('email');
-
-        let targetUserId = userId;
-        if (!targetUserId && email) {
-          const userRows = await sql`SELECT id FROM users WHERE email = ${email};`;
-          if (userRows.length > 0) {
-            targetUserId = userRows[0].id;
-          }
+        const session = await getAuthenticatedSession();
+        if (!session) {
+          return Response.json(
+            { success: false, error: 'Unauthorized: Valid Session Token required to access vault' },
+            { status: 401, headers: corsHeaders }
+          );
         }
 
-        if (!targetUserId) {
-          return Response.json({ success: false, error: 'userId or email is required' }, { status: 400, headers: corsHeaders });
-        }
+        const targetUserId = session.userId;
 
         const [passwordsRaw, secretsRaw, contacts, birthdays, wifiRaw] = await Promise.all([
           sql`SELECT * FROM credentials WHERE user_id = ${targetUserId} ORDER BY COALESCE(is_pinned, FALSE) DESC, created_at DESC;`,
@@ -121,14 +216,23 @@ export default {
       }
     }
 
-    // 3. Create a vault item
+    // 3. Create a vault item (Protected)
     if (url.pathname === '/api/vault/items' && request.method === 'POST') {
       try {
-        const body: any = await request.json();
-        const { type, userId, data } = body;
+        const session = await getAuthenticatedSession();
+        if (!session) {
+          return Response.json(
+            { success: false, error: 'Unauthorized: Valid Session Token required to add vault items' },
+            { status: 401, headers: corsHeaders }
+          );
+        }
 
-        if (!userId || !type || !data) {
-          return Response.json({ success: false, error: 'Missing type, userId, or data' }, { status: 400, headers: corsHeaders });
+        const body: any = await request.json();
+        const { type, data } = body;
+        const userId = session.userId; // Securely take userId from authenticated token
+
+        if (!type || !data) {
+          return Response.json({ success: false, error: 'Missing type or data' }, { status: 400, headers: corsHeaders });
         }
 
         const masterKey = env.AES_VAULT_MASTER_KEY;
@@ -177,14 +281,23 @@ export default {
       }
     }
 
-    // 4. Update a vault item
+    // 4. Update a vault item (Protected)
     if (url.pathname === '/api/vault/items' && request.method === 'PUT') {
       try {
-        const body: any = await request.json();
-        const { type, userId, itemId, data } = body;
+        const session = await getAuthenticatedSession();
+        if (!session) {
+          return Response.json(
+            { success: false, error: 'Unauthorized: Valid Session Token required to update vault items' },
+            { status: 401, headers: corsHeaders }
+          );
+        }
 
-        if (!userId || !type || !itemId || !data) {
-          return Response.json({ success: false, error: 'Missing type, userId, itemId, or data' }, { status: 400, headers: corsHeaders });
+        const body: any = await request.json();
+        const { type, itemId, data } = body;
+        const userId = session.userId; // Securely take userId from authenticated token
+
+        if (!type || !itemId || !data) {
+          return Response.json({ success: false, error: 'Missing type, itemId, or data' }, { status: 400, headers: corsHeaders });
         }
 
         const masterKey = env.AES_VAULT_MASTER_KEY;
@@ -270,13 +383,22 @@ export default {
       }
     }
 
-    // --- 4. DELETE VAULT ITEM ---
+    // 5. Delete a vault item (Protected)
     if (request.method === 'DELETE' && url.pathname === '/api/vault/items') {
       try {
-        const body = await request.json() as any;
-        const { type, userId, itemId } = body;
+        const session = await getAuthenticatedSession();
+        if (!session) {
+          return Response.json(
+            { success: false, error: 'Unauthorized: Valid Session Token required to delete vault items' },
+            { status: 401, headers: corsHeaders }
+          );
+        }
 
-        if (!type || !userId || !itemId) {
+        const body = await request.json() as any;
+        const { type, itemId } = body;
+        const userId = session.userId; // Securely take userId from authenticated token
+
+        if (!type || !itemId) {
           return Response.json({ success: false, error: 'Missing required parameters' }, { status: 400, headers: corsHeaders });
         }
 
