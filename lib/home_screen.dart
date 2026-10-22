@@ -31,6 +31,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _contacts = [];
   List<dynamic> _birthdays = [];
 
+  // Toggle tracking for revealing hidden passwords
+  final Set<String> _revealedPasswordIds = {};
+
   // Clean Typography-Only Tabs (No Icons)
   final List<Map<String, String>> _tabs = [
     {'type': 'password', 'title': 'Passwords'},
@@ -88,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final TextEditingController field1 = TextEditingController();
     final TextEditingController field2 = TextEditingController();
     final TextEditingController field3 = TextEditingController();
+    final TextEditingController field4 = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -97,68 +101,103 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 22,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Add New $title',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(ctx),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.borderMuted,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text('Close', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                ],
+        bool obscurePassword = true;
+
+        return StatefulBuilder(
+          builder: (modalContext, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 22,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
               ),
-              const SizedBox(height: 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Add New $title',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(ctx),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.borderMuted,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text('Close', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
 
-              if (type == 'password') ...[
-                _buildModalInput(controller: field1, label: 'Account / Service (e.g. Netflix, Gmail)'),
-                const SizedBox(height: 12),
-                _buildModalInput(controller: field2, label: 'Username or Email'),
-                const SizedBox(height: 12),
-                _buildModalInput(controller: field3, label: 'Password', isPassword: true),
-              ] else if (type == 'secret') ...[
-                _buildModalInput(controller: field1, label: 'Secret Title (e.g. WiFi, Safe Pin)'),
-                const SizedBox(height: 12),
-                _buildModalInput(controller: field2, label: 'Secret Content / Note', maxLines: 3),
-              ] else if (type == 'contact') ...[
-                _buildModalInput(controller: field1, label: 'Full Name'),
-                const SizedBox(height: 12),
-                _buildModalInput(controller: field2, label: 'Phone Number (e.g. +63 917...)'),
-                const SizedBox(height: 12),
-                _buildModalInput(controller: field3, label: 'Relationship / Note (e.g. Mama, Doctor)'),
-              ] else if (type == 'birthday') ...[
-                _buildModalInput(controller: field1, label: 'Family Member Name'),
-                const SizedBox(height: 12),
-                _buildModalInput(controller: field2, label: 'Birthdate (YYYY-MM-DD)'),
-                const SizedBox(height: 12),
-                _buildModalInput(controller: field3, label: 'Relationship (e.g. Mother, Brother)'),
-              ],
+                  if (type == 'password') ...[
+                    _buildModalInput(controller: field1, label: 'Account / Service (e.g. Netflix, Gmail)'),
+                    const SizedBox(height: 12),
+                    _buildModalInput(controller: field2, label: 'Username or Email'),
+                    const SizedBox(height: 12),
+                    _buildModalInput(
+                      controller: field3,
+                      label: 'Password',
+                      isPassword: obscurePassword,
+                      suffix: GestureDetector(
+                        onTap: () {
+                          setModalState(() {
+                            obscurePassword = !obscurePassword;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 14),
+                          child: Center(
+                            widthFactor: 1,
+                            child: Text(
+                              obscurePassword ? 'Show' : 'Hide',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primaryMatcha,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildModalInput(
+                      controller: field4,
+                      label: 'Note / Hint (Optional)',
+                      maxLines: 3,
+                    ),
+                  ] else if (type == 'secret') ...[
+                    _buildModalInput(controller: field1, label: 'Secret Title (e.g. WiFi, Safe Pin)'),
+                    const SizedBox(height: 12),
+                    _buildModalInput(controller: field2, label: 'Secret Content / Note', maxLines: 3),
+                  ] else if (type == 'contact') ...[
+                    _buildModalInput(controller: field1, label: 'Full Name'),
+                    const SizedBox(height: 12),
+                    _buildModalInput(controller: field2, label: 'Phone Number (e.g. +63 917...)'),
+                    const SizedBox(height: 12),
+                    _buildModalInput(controller: field3, label: 'Relationship / Note (e.g. Mama, Doctor)'),
+                  ] else if (type == 'birthday') ...[
+                    _buildModalInput(controller: field1, label: 'Family Member Name'),
+                    const SizedBox(height: 12),
+                    _buildModalInput(controller: field2, label: 'Birthdate (YYYY-MM-DD)'),
+                    const SizedBox(height: 12),
+                    _buildModalInput(controller: field3, label: 'Relationship (e.g. Mother, Brother)'),
+                  ],
 
-              const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
               SizedBox(
                 width: double.infinity,
@@ -176,6 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         'title': field1.text.trim(),
                         'username_or_email': field2.text.trim(),
                         'password': field3.text.trim(),
+                        'notes': field4.text.trim(),
                       };
                     } else if (type == 'secret') {
                       itemData = {
@@ -218,6 +258,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         );
+          },
+        );
       },
     );
   }
@@ -227,6 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String label,
     bool isPassword = false,
     int maxLines = 1,
+    Widget? suffix,
   }) {
     return TextField(
       controller: controller,
@@ -237,6 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
         labelStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
         filled: true,
         fillColor: AppColors.cardSurface,
+        suffixIcon: suffix,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.borderMuted),
@@ -440,39 +484,30 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Helper Note Card
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.cardSurface,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: AppColors.borderMuted, width: 1.2),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      _getTabEmptyExplanation(_selectedTabIndex),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        height: 1.45,
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'End-to-End Encrypted via Neon Cloud',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.sageMatcha,
-                      ),
-                    ),
-                  ],
+              // Pure Minimalist Typography Note (No Box/Card)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  _getTabEmptyExplanation(_selectedTabIndex),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+              const Text(
+                'End-to-End Encrypted via Neon Cloud',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.sageMatcha,
+                ),
+              ),
+              const SizedBox(height: 24),
 
               Text(
                 'Tap "Add $tabName" below to get started',
@@ -495,11 +530,27 @@ class _HomeScreenState extends State<HomeScreen> {
         final item = items[index];
 
         if (_selectedTabIndex == 0) {
+          final String itemId = item['id']?.toString() ?? index.toString();
+          final bool isRevealed = _revealedPasswordIds.contains(itemId);
+          final String rawPassword = item['encrypted_password'] ?? '';
+
           return _buildItemCard(
             title: item['title'] ?? 'Account',
             subtitle: item['username_or_email'] ?? '',
-            badge: item['category'] ?? 'General',
-            copyContent: item['encrypted_password'] ?? '',
+            badge: 'Login',
+            noteContent: item['notes'],
+            passwordContent: rawPassword,
+            isPasswordRevealed: isRevealed,
+            onTogglePassword: () {
+              setState(() {
+                if (isRevealed) {
+                  _revealedPasswordIds.remove(itemId);
+                } else {
+                  _revealedPasswordIds.add(itemId);
+                }
+              });
+            },
+            copyContent: rawPassword,
           );
         } else if (_selectedTabIndex == 1) {
           return _buildItemCard(
@@ -530,6 +581,10 @@ class _HomeScreenState extends State<HomeScreen> {
     required String title,
     required String subtitle,
     required String badge,
+    String? noteContent,
+    String? passwordContent,
+    bool isPasswordRevealed = false,
+    VoidCallback? onTogglePassword,
     String? copyContent,
   }) {
     return Container(
@@ -582,11 +637,73 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (noteContent != null && noteContent.trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Note: ${noteContent.trim()}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: AppColors.sageMatcha,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                if (passwordContent != null) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.oatMilkBg,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      isPasswordRevealed
+                          ? passwordContent
+                          : ('•' * (passwordContent.isEmpty ? 8 : passwordContent.length.clamp(8, 14))),
+                      style: TextStyle(
+                        fontSize: isPasswordRevealed ? 12.5 : 15,
+                        letterSpacing: isPasswordRevealed ? 0.2 : 2.0,
+                        fontWeight: FontWeight.w700,
+                        color: isPasswordRevealed ? AppColors.primaryMatcha : AppColors.textMuted,
+                        fontFamily: isPasswordRevealed ? null : 'monospace',
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
+          if (onTogglePassword != null) ...[
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onTogglePassword,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isPasswordRevealed
+                      ? AppColors.primaryMatcha.withValues(alpha: 0.15)
+                      : AppColors.oatMilkBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isPasswordRevealed ? AppColors.primaryMatcha : AppColors.borderMuted,
+                  ),
+                ),
+                child: Text(
+                  isPasswordRevealed ? 'Hide' : 'Show',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isPasswordRevealed ? AppColors.primaryMatcha : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (copyContent != null) ...[
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             GestureDetector(
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(

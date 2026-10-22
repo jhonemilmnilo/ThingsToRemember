@@ -106,8 +106,8 @@ export default {
         let inserted;
         if (type === 'password') {
           inserted = await sql`
-            INSERT INTO credentials (user_id, title, category, username_or_email, encrypted_password, iv, website_url)
-            VALUES (${userId}, ${data.title}, ${data.category || 'General'}, ${data.username_or_email}, ${data.password}, 'plain', ${data.website_url || null})
+            INSERT INTO credentials (user_id, title, username_or_email, encrypted_password, notes)
+            VALUES (${userId}, ${data.title}, ${data.username_or_email}, ${data.password}, ${data.notes || null})
             RETURNING *;
           `;
         } else if (type === 'secret') {
