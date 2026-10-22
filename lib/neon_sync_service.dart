@@ -82,4 +82,33 @@ class NeonSyncService {
       return false;
     }
   }
+
+  /// Update an item in Neon DB
+  static Future<bool> updateVaultItem({
+    required String userId,
+    required String itemId,
+    required String type,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$_baseUrl/api/vault/items'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'type': type,
+          'userId': userId,
+          'itemId': itemId,
+          'data': data,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return decoded['success'] == true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
 }

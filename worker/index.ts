@@ -138,6 +138,69 @@ export default {
       }
     }
 
+    // 4. Update a vault item
+    if (url.pathname === '/api/vault/items' && request.method === 'PUT') {
+      try {
+        const body: any = await request.json();
+        const { type, userId, itemId, data } = body;
+
+        if (!userId || !type || !itemId || !data) {
+          return Response.json({ success: false, error: 'Missing type, userId, itemId, or data' }, { status: 400, headers: corsHeaders });
+        }
+
+        let updated;
+        if (type === 'password') {
+          updated = await sql`
+            UPDATE credentials
+            SET title = ${data.title},
+                username_or_email = ${data.username_or_email},
+                encrypted_password = ${data.password},
+                notes = ${data.notes || null},
+                updated_at = NOW()
+            WHERE id = ${itemId} AND user_id = ${userId}
+            RETURNING *;
+          `;
+        } else if (type === 'secret') {
+          updated = await sql`
+            UPDATE secure_notes
+            SET title = ${data.title},
+                content = ${data.content},
+                updated_at = NOW()
+            WHERE id = ${itemId} AND user_id = ${userId}
+            RETURNING *;
+          `;
+        } else if (type === 'contact') {
+          updated = await sql`
+            UPDATE emergency_contacts
+            SET name = ${data.name},
+                phone_number = ${data.phone_number},
+                relationship = ${data.relationship || 'General'},
+                notes = ${data.notes || null},
+                updated_at = NOW()
+            WHERE id = ${itemId} AND user_id = ${userId}
+            RETURNING *;
+          `;
+        } else if (type === 'birthday') {
+          updated = await sql`
+            UPDATE family_members
+            SET name = ${data.name},
+                relationship = ${data.relationship || 'Family'},
+                birthdate = ${data.birthdate},
+                notes = ${data.notes || null},
+                updated_at = NOW()
+            WHERE id = ${itemId} AND user_id = ${userId}
+            RETURNING *;
+          `;
+        } else {
+          return Response.json({ success: false, error: 'Invalid type' }, { status: 400, headers: corsHeaders });
+        }
+
+        return Response.json({ success: true, item: updated[0] }, { headers: corsHeaders });
+      } catch (err: any) {
+        return Response.json({ success: false, error: err.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
     return Response.json({ error: 'Endpoint Not Found' }, { status: 404, headers: corsHeaders });
   },
 };

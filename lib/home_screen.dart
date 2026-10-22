@@ -580,62 +580,39 @@ class _HomeScreenState extends State<HomeScreen> {
           splashColor: AppColors.primaryMatcha.withValues(alpha: 0.08),
           highlightColor: AppColors.primaryMatcha.withValues(alpha: 0.04),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (noteContent != null && noteContent.trim().isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          'Note: ${noteContent.trim()}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
-                            color: AppColors.sageMatcha,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.oatMilkBg,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.borderMuted),
-                  ),
-                  child: const Text(
-                    'View →',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primaryMatcha,
+                const SizedBox(height: 5),
+                Text(
+                  subtitle,
+                  style: const TextStyle(fontSize: 13.5, color: AppColors.textMuted),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (noteContent != null && noteContent.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Note: ${noteContent.trim()}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: AppColors.sageMatcha,
+                      fontWeight: FontWeight.w500,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -643,6 +620,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
   void _openItemDetail(dynamic item, String type) {
     showModalBottomSheet(
       context: context,
@@ -650,6 +628,30 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         bool showSecretPassword = false;
+        bool isEditing = false;
+        bool isSaving = false;
+
+        // Editable controllers
+        final edit1 = TextEditingController(
+          text: type == 'password' || type == 'secret' ? (item['title'] ?? '') : (item['name'] ?? ''),
+        );
+        final edit2 = TextEditingController(
+          text: type == 'password'
+              ? (item['username_or_email'] ?? '')
+              : (type == 'secret'
+                  ? (item['content'] ?? '')
+                  : (type == 'contact'
+                      ? (item['phone_number'] ?? '')
+                      : (item['birthdate']?.toString().split('T').first ?? ''))),
+        );
+        final edit3 = TextEditingController(
+          text: type == 'password'
+              ? (item['encrypted_password'] ?? '')
+              : (type == 'contact' || type == 'birthday' ? (item['relationship'] ?? '') : ''),
+        );
+        final edit4 = TextEditingController(
+          text: item['notes'] ?? '',
+        );
 
         return StatefulBuilder(
           builder: (context, setDetailState) {
@@ -690,7 +692,7 @@ class _HomeScreenState extends State<HomeScreen> {
             }
 
             return Container(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+              padding: EdgeInsets.fromLTRB(24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 32),
               decoration: const BoxDecoration(
                 color: AppColors.cardSurface,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -718,7 +720,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              title,
+                              isEditing ? 'Edit ${type == 'password' ? 'Password' : 'Item'}' : title,
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
@@ -727,75 +729,281 @@ class _HomeScreenState extends State<HomeScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          GestureDetector(
-                            onTap: () => Navigator.pop(ctx),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: AppColors.oatMilkBg,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppColors.borderMuted),
-                              ),
-                              child: const Text(
-                                'Close',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  setDetailState(() {
+                                    isEditing = !isEditing;
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: isEditing
+                                        ? AppColors.primaryMatcha.withValues(alpha: 0.15)
+                                        : AppColors.oatMilkBg,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isEditing ? AppColors.primaryMatcha : AppColors.borderMuted,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    isEditing ? 'Cancel' : 'Edit',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: isEditing ? AppColors.primaryMatcha : AppColors.textPrimary,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () => Navigator.pop(ctx),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.oatMilkBg,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppColors.borderMuted),
+                                  ),
+                                  child: const Text(
+                                    'Close',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                       const SizedBox(height: 20),
-                      ...fields.map((field) {
-                        final bool isPassField = field['isPassword'] == 'true';
-                        final String val = field['value'] ?? '';
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 14),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.oatMilkBg,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.borderMuted),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                field['label']!.toUpperCase(),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  letterSpacing: 0.8,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.sageMatcha,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      isPassField
-                                          ? (showSecretPassword ? val : ('•' * (val.isEmpty ? 8 : val.length.clamp(8, 14))))
-                                          : val,
-                                      style: TextStyle(
-                                        fontSize: 14.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.textPrimary,
-                                        letterSpacing: (isPassField && !showSecretPassword) ? 2.0 : 0.2,
-                                      ),
+                      if (isEditing) ...[
+                        // ✏️ Inline Edit Mode
+                        if (type == 'password') ...[
+                          _buildModalInput(controller: edit1, label: 'Service / Title'),
+                          const SizedBox(height: 12),
+                          _buildModalInput(controller: edit2, label: 'Username or Email'),
+                          const SizedBox(height: 12),
+                          _buildModalInput(
+                            controller: edit3,
+                            label: 'Password',
+                            isPassword: !showSecretPassword,
+                            suffix: GestureDetector(
+                              onTap: () {
+                                setDetailState(() {
+                                  showSecretPassword = !showSecretPassword;
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 14),
+                                child: Center(
+                                  widthFactor: 1,
+                                  child: Text(
+                                    showSecretPassword ? 'Hide' : 'Show',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primaryMatcha,
                                     ),
                                   ),
-                                  if (isPassField) ...[
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildModalInput(controller: edit4, label: 'Note / Hint (Optional)', maxLines: 3),
+                        ] else if (type == 'secret') ...[
+                          _buildModalInput(controller: edit1, label: 'Secret Title'),
+                          const SizedBox(height: 12),
+                          _buildModalInput(controller: edit2, label: 'Secret Content', maxLines: 4),
+                        ] else if (type == 'contact') ...[
+                          _buildModalInput(controller: edit1, label: 'Full Name'),
+                          const SizedBox(height: 12),
+                          _buildModalInput(controller: edit2, label: 'Phone Number'),
+                          const SizedBox(height: 12),
+                          _buildModalInput(controller: edit3, label: 'Relationship'),
+                          const SizedBox(height: 12),
+                          _buildModalInput(controller: edit4, label: 'Notes (Optional)', maxLines: 2),
+                        ] else ...[
+                          _buildModalInput(controller: edit1, label: 'Name'),
+                          const SizedBox(height: 12),
+                          _buildModalInput(controller: edit2, label: 'Birthdate (YYYY-MM-DD)'),
+                          const SizedBox(height: 12),
+                          _buildModalInput(controller: edit3, label: 'Relationship'),
+                        ],
+
+                        const SizedBox(height: 22),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: isSaving
+                                ? null
+                                : () async {
+                                    if (_activeUserId == null) return;
+                                    setDetailState(() => isSaving = true);
+
+                                    Map<String, dynamic> updateData = {};
+                                    if (type == 'password') {
+                                      updateData = {
+                                        'title': edit1.text.trim(),
+                                        'username_or_email': edit2.text.trim(),
+                                        'password': edit3.text.trim(),
+                                        'notes': edit4.text.trim(),
+                                      };
+                                    } else if (type == 'secret') {
+                                      updateData = {
+                                        'title': edit1.text.trim(),
+                                        'content': edit2.text.trim(),
+                                      };
+                                    } else if (type == 'contact') {
+                                      updateData = {
+                                        'name': edit1.text.trim(),
+                                        'phone_number': edit2.text.trim(),
+                                        'relationship': edit3.text.trim(),
+                                        'notes': edit4.text.trim(),
+                                      };
+                                    } else if (type == 'birthday') {
+                                      updateData = {
+                                        'name': edit1.text.trim(),
+                                        'birthdate': edit2.text.trim(),
+                                        'relationship': edit3.text.trim(),
+                                      };
+                                    }
+
+                                    final success = await NeonSyncService.updateVaultItem(
+                                      userId: _activeUserId!,
+                                      itemId: item['id'].toString(),
+                                      type: type,
+                                      data: updateData,
+                                    );
+
+                                    if (!context.mounted) return;
+
+                                    if (success) {
+                                      Navigator.pop(ctx);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          backgroundColor: AppColors.primaryMatcha,
+                                          behavior: SnackBarBehavior.floating,
+                                          content: Text('Changes saved successfully!'),
+                                        ),
+                                      );
+                                      _loadVaultData();
+                                    } else {
+                                      setDetailState(() => isSaving = false);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          backgroundColor: Colors.redAccent,
+                                          behavior: SnackBarBehavior.floating,
+                                          content: Text('Failed to update. Please try again.'),
+                                        ),
+                                      );
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryMatcha,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                            child: isSaving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Text(
+                                    'Save Changes',
+                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                                  ),
+                          ),
+                        ),
+                      ] else ...[
+                        // 👁️ Read-Only View Mode
+                        ...fields.map((field) {
+                          final bool isPassField = field['isPassword'] == 'true';
+                          final String val = field['value'] ?? '';
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 14),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppColors.oatMilkBg,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.borderMuted),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  field['label']!.toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    letterSpacing: 0.8,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.sageMatcha,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        isPassField
+                                            ? (showSecretPassword ? val : ('•' * (val.isEmpty ? 8 : val.length.clamp(8, 14))))
+                                            : val,
+                                        style: TextStyle(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textPrimary,
+                                          letterSpacing: (isPassField && !showSecretPassword) ? 2.0 : 0.2,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isPassField) ...[
+                                      const SizedBox(width: 8),
+                                      GestureDetector(
+                                        onTap: () {
+                                          setDetailState(() {
+                                            showSecretPassword = !showSecretPassword;
+                                          });
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.cardSurface,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: AppColors.borderMuted),
+                                          ),
+                                          child: Text(
+                                            showSecretPassword ? 'Hide' : 'Show',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.primaryMatcha,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                     const SizedBox(width: 8),
                                     GestureDetector(
                                       onTap: () {
-                                        setDetailState(() {
-                                          showSecretPassword = !showSecretPassword;
-                                        });
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            backgroundColor: AppColors.primaryMatcha,
+                                            behavior: SnackBarBehavior.floating,
+                                            duration: const Duration(seconds: 1),
+                                            content: Text('Copied ${field['label']} to clipboard!'),
+                                          ),
+                                        );
                                       },
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -804,9 +1012,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                           borderRadius: BorderRadius.circular(8),
                                           border: Border.all(color: AppColors.borderMuted),
                                         ),
-                                        child: Text(
-                                          showSecretPassword ? 'Hide' : 'Show',
-                                          style: const TextStyle(
+                                        child: const Text(
+                                          'Copy',
+                                          style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w700,
                                             color: AppColors.primaryMatcha,
@@ -815,41 +1023,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                     ),
                                   ],
-                                  const SizedBox(width: 8),
-                                  GestureDetector(
-                                    onTap: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          backgroundColor: AppColors.primaryMatcha,
-                                          behavior: SnackBarBehavior.floating,
-                                          duration: const Duration(seconds: 1),
-                                          content: Text('Copied ${field['label']} to clipboard!'),
-                                        ),
-                                      );
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.cardSurface,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: AppColors.borderMuted),
-                                      ),
-                                      child: const Text(
-                                        'Copy',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.primaryMatcha,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
                     ],
                   ),
                 ),
