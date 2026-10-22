@@ -11,6 +11,7 @@
   - `"implement"`
   - `"go ahead"` / `"execute"`
 - During planning, discussions, reviews, and architecture phases: **pure concepts, tables, bullets, and wireframes only. Zero unsolicited code.**
+- **NO ICONS RULE**: Do NOT use decorative icons in the UI. Rely on clean, modern typography, generous whitespace, minimalist borders, and text badges instead.
 - Step-by-step implementation; wait for alignment before dropping code.
 - Clean architecture and best practices over quick hacks.
 - Always check config & environment integrity before running migrations or schemas.

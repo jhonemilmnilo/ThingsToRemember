@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class NeonSyncService {
-  // 🌐 Permanent 24/7 Cloudflare Edge Worker connected to Neon Postgres
-  static const String _syncApiUrl =
-      'https://passkeep-api.nilojhonemil1.workers.dev/api/users/sync';
+  // 🌐 Live 24/7 Cloudflare Edge Worker connected to Neon Postgres
+  static const String _baseUrl =
+      'https://passkeep-api.nilojhonemil1.workers.dev';
 
   /// Upsert Google user into Neon Postgres 'users' table
   static Future<Map<String, dynamic>?> syncUser({
@@ -14,10 +14,8 @@ class NeonSyncService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse(_syncApiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        Uri.parse('$_baseUrl/api/users/sync'),
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
           'name': name ?? 'User',
@@ -32,8 +30,56 @@ class NeonSyncService {
         }
       }
       return null;
-    } catch (e) {
+    } catch (_) {
       return null;
+    }
+  }
+
+  /// Fetch all real vault records for user
+  static Future<Map<String, dynamic>?> fetchVaultItems({
+    required String email,
+    String? userId,
+  }) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/vault/items?email=$email${userId != null ? '&userId=$userId' : ''}');
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['success'] == true) {
+          return decoded;
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Create an item in Neon DB
+  static Future<bool> createVaultItem({
+    required String userId,
+    required String type, // 'password' | 'secret' | 'contact' | 'birthday'
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/vault/items'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'type': type,
+          'userId': userId,
+          'data': data,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return decoded['success'] == true;
+      }
+      return false;
+    } catch (_) {
+      return false;
     }
   }
 }

@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'theme.dart';
+import 'neon_sync_service.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userName;
   final String userEmail;
+  final String? userId;
 
   const HomeScreen({
     super.key,
-    this.userName = 'Jhon Emil',
-    this.userEmail = 'jhonemil@example.com',
+    required this.userName,
+    required this.userEmail,
+    this.userId,
   });
 
   @override
@@ -18,22 +22,243 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTabIndex = 0;
+  bool _isLoading = true;
+  String? _activeUserId;
 
-  final List<Map<String, dynamic>> _tabs = [
-    {'title': 'Passwords', 'icon': LucideIcons.keyRound},
-    {'title': 'Secrets', 'icon': LucideIcons.lock},
-    {'title': 'Contacts', 'icon': LucideIcons.phoneCall},
-    {'title': 'Birthdays', 'icon': LucideIcons.cake},
+  // Real Database Lists
+  List<dynamic> _passwords = [];
+  List<dynamic> _secrets = [];
+  List<dynamic> _contacts = [];
+  List<dynamic> _birthdays = [];
+
+  // Clean Typography-Only Tabs (No Icons)
+  final List<Map<String, String>> _tabs = [
+    {'type': 'password', 'title': 'Passwords'},
+    {'type': 'secret', 'title': 'Secrets'},
+    {'type': 'contact', 'title': 'Contacts'},
+    {'type': 'birthday', 'title': 'Birthdays'},
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _activeUserId = widget.userId;
+    _loadVaultData();
+  }
+
+  Future<void> _loadVaultData() async {
+    setState(() => _isLoading = true);
+    final result = await NeonSyncService.fetchVaultItems(
+      email: widget.userEmail,
+      userId: _activeUserId,
+    );
+
+    if (!mounted) return;
+
+    if (result != null) {
+      setState(() {
+        _activeUserId = result['userId'] ?? _activeUserId;
+        _passwords = result['passwords'] ?? [];
+        _secrets = result['secrets'] ?? [];
+        _contacts = result['contacts'] ?? [];
+        _birthdays = result['birthdays'] ?? [];
+        _isLoading = false;
+      });
+    } else {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      await GoogleSignIn().signOut();
+    } catch (_) {}
+
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+  }
+
+  void _showAddItemModal() {
+    final activeTab = _tabs[_selectedTabIndex];
+    final String type = activeTab['type']!;
+    final String title = activeTab['title']!;
+
+    final TextEditingController field1 = TextEditingController();
+    final TextEditingController field2 = TextEditingController();
+    final TextEditingController field3 = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.oatMilkBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 22,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Add New $title',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(ctx),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.borderMuted,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text('Close', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+
+              if (type == 'password') ...[
+                _buildModalInput(controller: field1, label: 'Account / Service (e.g. Netflix, Gmail)'),
+                const SizedBox(height: 12),
+                _buildModalInput(controller: field2, label: 'Username or Email'),
+                const SizedBox(height: 12),
+                _buildModalInput(controller: field3, label: 'Password', isPassword: true),
+              ] else if (type == 'secret') ...[
+                _buildModalInput(controller: field1, label: 'Secret Title (e.g. WiFi, Safe Pin)'),
+                const SizedBox(height: 12),
+                _buildModalInput(controller: field2, label: 'Secret Content / Note', maxLines: 3),
+              ] else if (type == 'contact') ...[
+                _buildModalInput(controller: field1, label: 'Full Name'),
+                const SizedBox(height: 12),
+                _buildModalInput(controller: field2, label: 'Phone Number (e.g. +63 917...)'),
+                const SizedBox(height: 12),
+                _buildModalInput(controller: field3, label: 'Relationship / Note (e.g. Mama, Doctor)'),
+              ] else if (type == 'birthday') ...[
+                _buildModalInput(controller: field1, label: 'Family Member Name'),
+                const SizedBox(height: 12),
+                _buildModalInput(controller: field2, label: 'Birthdate (YYYY-MM-DD)'),
+                const SizedBox(height: 12),
+                _buildModalInput(controller: field3, label: 'Relationship (e.g. Mother, Brother)'),
+              ],
+
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (_activeUserId == null) {
+                      Navigator.pop(ctx);
+                      return;
+                    }
+
+                    Map<String, dynamic> itemData = {};
+                    if (type == 'password') {
+                      itemData = {
+                        'title': field1.text.trim(),
+                        'username_or_email': field2.text.trim(),
+                        'password': field3.text.trim(),
+                      };
+                    } else if (type == 'secret') {
+                      itemData = {
+                        'title': field1.text.trim(),
+                        'content': field2.text.trim(),
+                      };
+                    } else if (type == 'contact') {
+                      itemData = {
+                        'name': field1.text.trim(),
+                        'phone_number': field2.text.trim(),
+                        'relationship': field3.text.trim(),
+                      };
+                    } else if (type == 'birthday') {
+                      itemData = {
+                        'name': field1.text.trim(),
+                        'birthdate': field2.text.trim().isEmpty ? '2000-01-01' : field2.text.trim(),
+                        'relationship': field3.text.trim(),
+                      };
+                    }
+
+                    Navigator.pop(ctx);
+                    setState(() => _isLoading = true);
+
+                    await NeonSyncService.createVaultItem(
+                      userId: _activeUserId!,
+                      type: type,
+                      data: itemData,
+                    );
+
+                    await _loadVaultData();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryMatcha,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: const Text('Save to Neon Vault', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildModalInput({
+    required TextEditingController controller,
+    required String label,
+    bool isPassword = false,
+    int maxLines = 1,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: isPassword,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+        filled: true,
+        fillColor: AppColors.cardSurface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.borderMuted),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.primaryMatcha, width: 1.5),
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final int totalCount = _passwords.length + _secrets.length + _contacts.length + _birthdays.length;
+
     return Scaffold(
       backgroundColor: AppColors.oatMilkBg,
       body: SafeArea(
         child: Column(
           children: [
-            // 🌿 1. Vault Header
+            // 🌿 1. Header with dynamic user info & Log Out Button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 16.0),
               child: Row(
@@ -52,90 +277,41 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppColors.sageMatcha,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'PassKeep Life Vault • Encrypted',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: AppColors.textMuted,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        'PassKeep • $totalCount Items Secured',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.textMuted,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
-                  // App Icon Mini Avatar
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppColors.cardSurface,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.pistachioMint, width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primaryMatcha.withValues(alpha: 0.08),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                  // Log Out Pill (Clean text, no icon)
+                  GestureDetector(
+                    onTap: _handleLogout,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardSurface,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.alertPersimmon.withValues(alpha: 0.5), width: 1.2),
+                      ),
+                      child: const Text(
+                        'Log Out',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.alertPersimmon,
                         ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(6),
-                    child: ClipOval(
-                      child: Image.asset('assets/icon/app_icon.png', fit: BoxFit.cover),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
 
-            // 🔍 2. Minimalist Search Bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22.0),
-              child: Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.cardSurface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.borderMuted, width: 1.2),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: const Row(
-                  children: [
-                    Icon(LucideIcons.search, size: 20, color: AppColors.sageMatcha),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: 'Search vault, secrets & contacts...',
-                          hintStyle: TextStyle(
-                            fontSize: 13.5,
-                            color: AppColors.textMuted,
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // 🍵 3. Category Filter Tabs
+            // 🍵 2. Typography Category Filter Tabs (Zero Icons)
             SizedBox(
               height: 40,
               child: ListView.separated(
@@ -147,11 +323,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   final bool isSelected = _selectedTabIndex == index;
                   final tab = _tabs[index];
 
+                  int count = 0;
+                  if (index == 0) count = _passwords.length;
+                  if (index == 1) count = _secrets.length;
+                  if (index == 2) count = _contacts.length;
+                  if (index == 3) count = _birthdays.length;
+
                   return GestureDetector(
                     onTap: () => setState(() => _selectedTabIndex = index),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
                         color: isSelected ? AppColors.primaryMatcha : AppColors.cardSurface,
                         borderRadius: BorderRadius.circular(20),
@@ -159,33 +341,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: isSelected ? AppColors.primaryMatcha : AppColors.borderMuted,
                           width: 1.2,
                         ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.primaryMatcha.withValues(alpha: 0.15),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ]
-                            : null,
                       ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            tab['icon'] as IconData,
-                            size: 16,
-                            color: isSelected ? Colors.white : AppColors.sageMatcha,
+                      child: Center(
+                        child: Text(
+                          '${tab['title']} ($count)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                            color: isSelected ? Colors.white : AppColors.textPrimary,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            tab['title'] as String,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: isSelected ? Colors.white : AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   );
@@ -195,174 +360,177 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 16),
 
-            // 📋 4. Content Area Based on Active Tab
+            // 📋 3. Dynamic Real List from Neon
             Expanded(
-              child: IndexedStack(
-                index: _selectedTabIndex,
-                children: [
-                  _buildPasswordsView(),
-                  _buildSecretsView(),
-                  _buildContactsView(),
-                  _buildBirthdaysView(),
-                ],
-              ),
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryMatcha),
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadVaultData,
+                      color: AppColors.primaryMatcha,
+                      child: _buildCurrentList(),
+                    ),
             ),
           ],
         ),
       ),
 
-      // ➕ Floating Action Button for Adding Data
+      // ➕ Floating Action Button for Adding Data (Text-Only Label)
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          // Open dynamic add modal based on selected tab
-        },
+        onPressed: _showAddItemModal,
         backgroundColor: AppColors.primaryMatcha,
         elevation: 3,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: const Icon(LucideIcons.plus, color: Colors.white, size: 20),
         label: Text(
           'Add ${_tabs[_selectedTabIndex]['title']}',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
         ),
       ),
     );
   }
 
-  // 1. Passwords View
-  Widget _buildPasswordsView() {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
-      children: [
-        _buildVaultCard(
-          icon: LucideIcons.globe,
-          title: 'Google Account',
-          subtitle: 'jhonemil@gmail.com',
-          tag: 'Work & Personal',
-          tagColor: AppColors.pistachioMint,
-        ),
-        _buildVaultCard(
-          icon: LucideIcons.smartphone,
-          title: 'Facebook / Meta',
-          subtitle: '09123456789',
-          tag: 'Social',
-          tagColor: AppColors.sageMatcha,
-        ),
-        _buildVaultCard(
-          icon: LucideIcons.creditCard,
-          title: 'BDO Online Banking',
-          subtitle: 'jhon_bdo_user',
-          tag: 'Finance',
-          tagColor: const Color(0xFFC8963E),
-        ),
-      ],
-    );
-  }
+  Widget _buildCurrentList() {
+    List<dynamic> items = [];
+    if (_selectedTabIndex == 0) items = _passwords;
+    if (_selectedTabIndex == 1) items = _secrets;
+    if (_selectedTabIndex == 2) items = _contacts;
+    if (_selectedTabIndex == 3) items = _birthdays;
 
-  // 2. Secrets View
-  Widget _buildSecretsView() {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
-      children: [
-        _buildVaultCard(
-          icon: LucideIcons.shieldAlert,
-          title: 'House Safe Combination',
-          subtitle: '•••• •••• ••••',
-          tag: 'Top Secret',
-          tagColor: AppColors.alertPersimmon,
-        ),
-        _buildVaultCard(
-          icon: LucideIcons.wifi,
-          title: 'Home Fiber WiFi Password',
-          subtitle: 'MatchaPasscode#2026',
-          tag: 'Home Network',
-          tagColor: AppColors.pistachioMint,
-        ),
-      ],
-    );
-  }
+    if (items.isEmpty) {
+      final String tabName = _tabs[_selectedTabIndex]['title']!;
 
-  // 3. Contacts View
-  Widget _buildContactsView() {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
-      children: [
-        _buildVaultCard(
-          icon: LucideIcons.userCheck,
-          title: 'Nanay (Emergency)',
-          subtitle: '+63 917 123 4567',
-          tag: 'Family',
-          tagColor: AppColors.sageMatcha,
-          isPhoneAction: true,
-        ),
-        _buildVaultCard(
-          icon: LucideIcons.heartPulse,
-          title: 'Family Doctor',
-          subtitle: '+63 928 987 6543',
-          tag: 'Medical',
-          tagColor: AppColors.primaryMatcha,
-          isPhoneAction: true,
-        ),
-      ],
-    );
-  }
-
-  // 4. Birthdays View
-  Widget _buildBirthdaysView() {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
-      children: [
-        // Birthday Reminder Banner
-        Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.pistachioMint.withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.pistachioMint, width: 1.2),
-          ),
-          child: const Row(
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(LucideIcons.sparkles, color: AppColors.primaryMatcha, size: 22),
-              SizedBox(width: 12),
-              Expanded(
+              // Clean Typography Container (Zero Icons)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.pistachioMint.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 child: Text(
-                  'Upcoming: Nanay\'s birthday is coming up soon!',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
+                  'VAULT STATUS',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w800,
                     color: AppColors.primaryMatcha,
                   ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Text(
+                'Your $tabName Vault is Empty',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Helper Note Card
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.cardSurface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.borderMuted, width: 1.2),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      _getTabEmptyExplanation(_selectedTabIndex),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        height: 1.45,
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'End-to-End Encrypted via Neon Cloud',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.sageMatcha,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              Text(
+                'Tap "Add $tabName" below to get started',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textMuted,
                 ),
               ),
             ],
           ),
         ),
-        _buildVaultCard(
-          icon: LucideIcons.cake,
-          title: 'Nanay',
-          subtitle: 'March 14 • Mother',
-          tag: 'Mother',
-          tagColor: AppColors.sageMatcha,
-        ),
-        _buildVaultCard(
-          icon: LucideIcons.cake,
-          title: 'Tatay',
-          subtitle: 'August 28 • Father',
-          tag: 'Father',
-          tagColor: AppColors.primaryMatcha,
-        ),
-      ],
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+
+        if (_selectedTabIndex == 0) {
+          return _buildItemCard(
+            title: item['title'] ?? 'Account',
+            subtitle: item['username_or_email'] ?? '',
+            badge: item['category'] ?? 'General',
+            copyContent: item['encrypted_password'] ?? '',
+          );
+        } else if (_selectedTabIndex == 1) {
+          return _buildItemCard(
+            title: item['title'] ?? 'Secret Note',
+            subtitle: item['content'] ?? '',
+            badge: 'Encrypted',
+            copyContent: item['content'] ?? '',
+          );
+        } else if (_selectedTabIndex == 2) {
+          return _buildItemCard(
+            title: item['name'] ?? 'Contact',
+            subtitle: item['phone_number'] ?? '',
+            badge: item['relationship'] ?? 'General',
+            copyContent: item['phone_number'] ?? '',
+          );
+        } else {
+          return _buildItemCard(
+            title: item['name'] ?? 'Family',
+            subtitle: 'Born: ${item['birthdate']?.toString().split('T').first ?? ''}',
+            badge: item['relationship'] ?? 'Family',
+          );
+        }
+      },
     );
   }
 
-  // Reusable Vault Card Widget
-  Widget _buildVaultCard({
-    required IconData icon,
+  Widget _buildItemCard({
     required String title,
     required String subtitle,
-    required String tag,
-    required Color tagColor,
-    bool isPhoneAction = false,
+    required String badge,
+    String? copyContent,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -370,30 +538,10 @@ class _HomeScreenState extends State<HomeScreen> {
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.borderMuted, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          // Icon Container
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: tagColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, size: 20, color: tagColor),
-          ),
-          const SizedBox(width: 14),
-
-          // Main Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,15 +562,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: tagColor.withValues(alpha: 0.12),
+                        color: AppColors.pistachioMint.withValues(alpha: 0.25),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        tag,
-                        style: TextStyle(
+                        badge,
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: tagColor,
+                          color: AppColors.primaryMatcha,
                         ),
                       ),
                     ),
@@ -431,42 +579,56 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textMuted,
-                  ),
+                  style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-
-          const SizedBox(width: 8),
-
-          // Quick Action Icon (Copy or Call)
-          IconButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  backgroundColor: AppColors.primaryMatcha,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  duration: const Duration(seconds: 1),
-                  content: Text(
-                    isPhoneAction ? 'Calling $title...' : 'Copied to clipboard!',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+          if (copyContent != null) ...[
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: AppColors.primaryMatcha,
+                    behavior: SnackBarBehavior.floating,
+                    duration: Duration(seconds: 1),
+                    content: Text('Copied to clipboard!'),
                   ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.oatMilkBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.borderMuted),
                 ),
-              );
-            },
-            icon: Icon(
-              isPhoneAction ? LucideIcons.phone : LucideIcons.copy,
-              size: 18,
-              color: AppColors.sageMatcha,
+                child: const Text(
+                  'Copy',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primaryMatcha),
+                ),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
+  }
+
+  String _getTabEmptyExplanation(int tabIndex) {
+    switch (tabIndex) {
+      case 0:
+        return 'No saved passwords or logins yet. Keep all your streaming, bank & work logins in one secure vault.';
+      case 1:
+        return 'No private secrets yet. Safely store recovery codes, WiFi passwords, and private personal memos.';
+      case 2:
+        return 'No emergency contacts saved yet. Store trusted family members, doctors, and emergency hotlines.';
+      case 3:
+        return 'No family birthdays recorded yet. Keep track of important family milestones and anniversaries.';
+      default:
+        return 'Your vault category is pristine and empty.';
+    }
   }
 }

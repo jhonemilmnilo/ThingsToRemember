@@ -29,7 +29,7 @@ export default {
       );
     }
 
-    // 1. Sync User (Google OAuth / Identity)
+    // 1. Sync / Fetch User by Email
     if (url.pathname === '/api/users/sync' && request.method === 'POST') {
       try {
         const body: any = await request.json();
@@ -55,37 +55,84 @@ export default {
       }
     }
 
-    // 2. Fetch User Vault Status
-    if (url.pathname === '/api/vault/status' && request.method === 'GET') {
+    // 2. Fetch all vault items for a user
+    if (url.pathname === '/api/vault/items' && request.method === 'GET') {
       try {
+        const userId = url.searchParams.get('userId');
         const email = url.searchParams.get('email');
-        if (!email) {
-          return Response.json({ success: false, error: 'Email parameter required' }, { status: 400, headers: corsHeaders });
+
+        let targetUserId = userId;
+        if (!targetUserId && email) {
+          const userRows = await sql`SELECT id FROM users WHERE email = ${email};`;
+          if (userRows.length > 0) {
+            targetUserId = userRows[0].id;
+          }
         }
 
-        const userRows = await sql`SELECT id FROM users WHERE email = ${email};`;
-        if (userRows.length === 0) {
-          return Response.json({ success: false, error: 'User not found' }, { status: 404, headers: corsHeaders });
+        if (!targetUserId) {
+          return Response.json({ success: false, error: 'userId or email is required' }, { status: 400, headers: corsHeaders });
         }
 
-        const userId = userRows[0].id;
-        const [creds, notes, contacts, family] = await Promise.all([
-          sql`SELECT count(*) as count FROM credentials WHERE user_id = ${userId}`,
-          sql`SELECT count(*) as count FROM secure_notes WHERE user_id = ${userId}`,
-          sql`SELECT count(*) as count FROM emergency_contacts WHERE user_id = ${userId}`,
-          sql`SELECT count(*) as count FROM family_members WHERE user_id = ${userId}`,
+        const [passwords, secrets, contacts, birthdays] = await Promise.all([
+          sql`SELECT * FROM credentials WHERE user_id = ${targetUserId} ORDER BY created_at DESC;`,
+          sql`SELECT * FROM secure_notes WHERE user_id = ${targetUserId} ORDER BY created_at DESC;`,
+          sql`SELECT * FROM emergency_contacts WHERE user_id = ${targetUserId} ORDER BY created_at DESC;`,
+          sql`SELECT * FROM family_members WHERE user_id = ${targetUserId} ORDER BY birthdate ASC;`,
         ]);
 
         return Response.json({
           success: true,
-          userId,
-          counts: {
-            credentials: parseInt(creds[0].count),
-            notes: parseInt(notes[0].count),
-            contacts: parseInt(contacts[0].count),
-            family: parseInt(family[0].count),
-          }
+          userId: targetUserId,
+          passwords,
+          secrets,
+          contacts,
+          birthdays,
         }, { headers: corsHeaders });
+      } catch (err: any) {
+        return Response.json({ success: false, error: err.message }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // 3. Create a vault item
+    if (url.pathname === '/api/vault/items' && request.method === 'POST') {
+      try {
+        const body: any = await request.json();
+        const { type, userId, data } = body;
+
+        if (!userId || !type || !data) {
+          return Response.json({ success: false, error: 'Missing type, userId, or data' }, { status: 400, headers: corsHeaders });
+        }
+
+        let inserted;
+        if (type === 'password') {
+          inserted = await sql`
+            INSERT INTO credentials (user_id, title, category, username_or_email, encrypted_password, iv, website_url)
+            VALUES (${userId}, ${data.title}, ${data.category || 'General'}, ${data.username_or_email}, ${data.password}, 'plain', ${data.website_url || null})
+            RETURNING *;
+          `;
+        } else if (type === 'secret') {
+          inserted = await sql`
+            INSERT INTO secure_notes (user_id, title, content)
+            VALUES (${userId}, ${data.title}, ${data.content})
+            RETURNING *;
+          `;
+        } else if (type === 'contact') {
+          inserted = await sql`
+            INSERT INTO emergency_contacts (user_id, name, phone_number, relationship, notes)
+            VALUES (${userId}, ${data.name}, ${data.phone_number}, ${data.relationship || 'General'}, ${data.notes || null})
+            RETURNING *;
+          `;
+        } else if (type === 'birthday') {
+          inserted = await sql`
+            INSERT INTO family_members (user_id, name, relationship, birthdate, notes)
+            VALUES (${userId}, ${data.name}, ${data.relationship || 'Family'}, ${data.birthdate}, ${data.notes || null})
+            RETURNING *;
+          `;
+        } else {
+          return Response.json({ success: false, error: 'Invalid type' }, { status: 400, headers: corsHeaders });
+        }
+
+        return Response.json({ success: true, item: inserted[0] }, { headers: corsHeaders });
       } catch (err: any) {
         return Response.json({ success: false, error: err.message }, { status: 500, headers: corsHeaders });
       }

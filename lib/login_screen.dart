@@ -23,15 +23,18 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 🚀 Native Android Google Account Picker
+      // 🚀 Force fresh account selection every time (No-Cache)
+      await _googleSignIn.signOut();
+
+      // Native Android Google Account Picker
       final GoogleSignInAccount? account = await _googleSignIn.signIn();
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
       if (account != null) {
-        // 🐘 Direct Neon Postgres Database Sync
-        await NeonSyncService.syncUser(
+        // 🐘 Direct Neon Postgres Database Sync via Cloudflare Worker
+        final syncedUser = await NeonSyncService.syncUser(
           email: account.email,
           name: account.displayName,
           provider: 'google',
@@ -43,6 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
             builder: (_) => HomeScreen(
               userName: account.displayName ?? 'Jhon Emil',
               userEmail: account.email,
+              userId: syncedUser?['id'],
             ),
           ),
         );
