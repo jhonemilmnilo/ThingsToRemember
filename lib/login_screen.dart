@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'theme.dart';
 
-import 'package:url_launcher/url_launcher.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,26 +13,41 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
-
-  static const String _neonAuthUrl =
-      'https://ep-icy-lab-az0dwxto.neonauth.c-3.ap-southeast-1.aws.neon.tech/neondb/auth/sign-in/social?provider=google';
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+  );
 
   void _handleGoogleSignIn() async {
     setState(() => _isLoading = true);
 
     try {
-      final Uri uri = Uri.parse(_neonAuthUrl);
-
-      final bool launched = await launchUrl(
-        uri,
-        mode: LaunchMode.inAppBrowserView,
-      );
+      // 🚀 Native Android Google Account Picker
+      final GoogleSignInAccount? account = await _googleSignIn.signIn();
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      if (!launched) {
-        throw 'Could not launch Google Sign In window';
+      if (account != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.primaryMatcha,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            content: Row(
+              children: [
+                const Icon(LucideIcons.checkCircle2, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Welcome, ${account.displayName ?? account.email}!',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
       }
     } catch (error) {
       if (!mounted) return;
