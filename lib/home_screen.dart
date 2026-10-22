@@ -3,10 +3,10 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'theme.dart';
 import 'neon_sync_service.dart';
 import 'login_screen.dart';
-import 'drawers/account_drawer.dart';
-import 'drawers/secret_drawer.dart';
-import 'drawers/contact_drawer.dart';
-import 'drawers/birthday_drawer.dart';
+import 'views/accounts_tab_view.dart';
+import 'views/secrets_tab_view.dart';
+import 'views/contacts_tab_view.dart';
+import 'views/birthdays_tab_view.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userName;
@@ -488,269 +488,36 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCurrentList() {
-    List<dynamic> items = [];
-    if (_selectedTabIndex == 0) items = _passwords;
-    if (_selectedTabIndex == 1) items = _secrets;
-    if (_selectedTabIndex == 2) items = _contacts;
-    if (_selectedTabIndex == 3) items = _birthdays;
-
-    if (items.isEmpty) {
-      final String tabName = _tabs[_selectedTabIndex]['title']!;
-
-      return Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Clean Typography Container (Zero Icons)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.pistachioMint.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'VAULT STATUS',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    letterSpacing: 1.2,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primaryMatcha,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              Text(
-                'Your $tabName Vault is Empty',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Pure Minimalist Typography Note (No Box/Card)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  _getTabEmptyExplanation(_selectedTabIndex),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'End-to-End Encrypted via Neon Cloud',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.sageMatcha,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              Text(
-                'Tap "Add $tabName" below to get started',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textMuted,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+    switch (_selectedTabIndex) {
+      case 0:
+        return AccountsTabView(
+          items: _passwords,
+          userId: _activeUserId,
+          onSaved: () => _reSortListAndNotify(_passwords, 'Changes saved successfully!'),
+        );
+      case 1:
+        return SecretsTabView(
+          items: _secrets,
+          userId: _activeUserId,
+          onSaved: () => _reSortListAndNotify(_secrets, 'Secret updated successfully!'),
+          onPinnedToggled: () => _reSortListAndNotify(_secrets, null),
+        );
+      case 2:
+        return ContactsTabView(
+          items: _contacts,
+          userId: _activeUserId,
+          onSaved: () => _reSortListAndNotify(_contacts, 'Contact updated successfully!'),
+          onPinnedToggled: () => _reSortListAndNotify(_contacts, null),
+        );
+      case 3:
+      default:
+        return BirthdaysTabView(
+          items: _birthdays,
+          userId: _activeUserId,
+          onSaved: () => _reSortListAndNotify(_birthdays, 'Birthday updated successfully!'),
+          onPinnedToggled: () => _reSortListAndNotify(_birthdays, null),
+        );
     }
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-
-        final isPinned = item['is_pinned'] == true;
-
-        if (_selectedTabIndex == 0) {
-          return _buildItemCard(
-            title: item['title'] ?? 'Account',
-            subtitle: item['username_or_email'] ?? '',
-            noteContent: item['notes'],
-            isPinned: isPinned,
-            onTap: () => _openAccountDetail(item),
-          );
-        } else if (_selectedTabIndex == 1) {
-          return _buildItemCard(
-            title: item['title'] ?? 'Secret Note',
-            subtitle: item['content'] ?? '',
-            isPinned: isPinned,
-            onTap: () => _openSecretDetail(item),
-          );
-        } else if (_selectedTabIndex == 2) {
-          return _buildItemCard(
-            title: item['name'] ?? 'Contact',
-            subtitle: item['phone_number'] ?? '',
-            noteContent: item['notes'] ?? item['relationship'],
-            isPinned: isPinned,
-            onTap: () => _openContactDetail(item),
-          );
-        } else {
-          return _buildItemCard(
-            title: item['name'] ?? 'Family',
-            subtitle: 'Born: ${item['birthdate']?.toString().split('T').first ?? ''}',
-            noteContent: item['relationship'],
-            isPinned: isPinned,
-            onTap: () => _openBirthdayDetail(item),
-          );
-        }
-      },
-    );
-  }
-
-  Widget _buildItemCard({
-    required String title,
-    required String subtitle,
-    String? noteContent,
-    bool isPinned = false,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.cardSurface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isPinned ? AppColors.primaryMatcha.withValues(alpha: 0.5) : AppColors.borderMuted,
-          width: isPinned ? 1.5 : 1.2,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: onTap,
-          splashColor: AppColors.primaryMatcha.withValues(alpha: 0.08),
-          highlightColor: AppColors.primaryMatcha.withValues(alpha: 0.04),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isPinned)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.pistachioMint.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'PINNED',
-                          style: TextStyle(
-                            fontSize: 10,
-                            letterSpacing: 0.8,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primaryMatcha,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  subtitle,
-                  style: const TextStyle(fontSize: 13.5, color: AppColors.textMuted),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (noteContent != null && noteContent.trim().isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Note: ${noteContent.trim()}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      color: AppColors.sageMatcha,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════
-  // MODULAR DRAWER DELEGATION (lib/drawers/)
-  // ═══════════════════════════════════════════════════════
-  void _openAccountDetail(dynamic item) {
-    if (_activeUserId == null) return;
-    AccountDrawer.show(
-      context: context,
-      item: item,
-      userId: _activeUserId!,
-      onSaved: () => _reSortListAndNotify(_passwords, 'Changes saved successfully!'),
-    );
-  }
-
-  void _openSecretDetail(dynamic item) {
-    if (_activeUserId == null) return;
-    SecretDrawer.show(
-      context: context,
-      item: item,
-      userId: _activeUserId!,
-      onSaved: () => _reSortListAndNotify(_secrets, 'Secret updated successfully!'),
-      onPinnedToggled: () => _reSortListAndNotify(_secrets, null),
-    );
-  }
-
-  void _openContactDetail(dynamic item) {
-    if (_activeUserId == null) return;
-    ContactDrawer.show(
-      context: context,
-      item: item,
-      userId: _activeUserId!,
-      onSaved: () => _reSortListAndNotify(_contacts, 'Contact updated successfully!'),
-      onPinnedToggled: () => _reSortListAndNotify(_contacts, null),
-    );
-  }
-
-  void _openBirthdayDetail(dynamic item) {
-    if (_activeUserId == null) return;
-    BirthdayDrawer.show(
-      context: context,
-      item: item,
-      userId: _activeUserId!,
-      onSaved: () => _reSortListAndNotify(_birthdays, 'Birthday updated successfully!'),
-      onPinnedToggled: () => _reSortListAndNotify(_birthdays, null),
-    );
   }
 
   void _reSortListAndNotify(List<dynamic> targetList, String? message) {
@@ -772,21 +539,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
       _loadVaultData();
-    }
-  }
-
-  String _getTabEmptyExplanation(int tabIndex) {
-    switch (tabIndex) {
-      case 0:
-        return 'No saved passwords or logins yet. Keep all your streaming, bank & work logins in one secure vault.';
-      case 1:
-        return 'No private secrets yet. Safely store recovery codes, WiFi passwords, and private personal memos.';
-      case 2:
-        return 'No emergency contacts saved yet. Store trusted family members, doctors, and emergency hotlines.';
-      case 3:
-        return 'No family birthdays recorded yet. Keep track of important family milestones and anniversaries.';
-      default:
-        return 'Your vault category is pristine and empty.';
     }
   }
 }
