@@ -11,12 +11,10 @@ class AccountDrawer {
     required dynamic item,
     required String userId,
     required VoidCallback onSaved,
-    required VoidCallback onPinnedToggled,
   }) {
     bool showPassword = false;
     bool isEditing = false;
     bool isSaving = false;
-    bool isPinned = item['is_pinned'] == true;
 
     final titleCtrl = TextEditingController(text: item['title'] ?? '');
     final userCtrl = TextEditingController(text: item['username_or_email'] ?? '');
@@ -148,13 +146,7 @@ class AccountDrawer {
                           label: 'Note / Hint (Optional)',
                           maxLines: 3,
                         ),
-                        const SizedBox(height: 14),
-
-                        DrawerComponents.pinToggleRow(
-                          isPinned: isPinned,
-                          onChanged: (val) => setDrawerState(() => isPinned = val),
-                        ),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 20),
 
                         SizedBox(
                           width: double.infinity,
@@ -174,13 +166,11 @@ class AccountDrawer {
                                         'username_or_email': userCtrl.text.trim(),
                                         'password': passCtrl.text.trim(),
                                         'notes': notesCtrl.text.trim(),
-                                        'is_pinned': isPinned,
                                       },
                                     );
 
                                     if (!context.mounted) return;
                                     if (updated) {
-                                      item['is_pinned'] = isPinned;
                                       Navigator.pop(ctx);
                                       onSaved();
                                     } else {
@@ -198,7 +188,7 @@ class AccountDrawer {
                                     height: 20,
                                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                   )
-                                : const Text('Save Changes', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                                : const Text('Save', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                           ),
                         ),
                       ] else ...[
@@ -224,23 +214,6 @@ class AccountDrawer {
                             value: item['notes'].toString().trim(),
                             canCopy: false,
                           ),
-                        const SizedBox(height: 6),
-                        DrawerComponents.pinToggleRow(
-                          isPinned: isPinned,
-                          onChanged: (val) async {
-                            setDrawerState(() {
-                              isPinned = val;
-                              item['is_pinned'] = val;
-                            });
-                            onPinnedToggled();
-                            await NeonSyncService.updateVaultItem(
-                              userId: userId,
-                              itemId: item['id'].toString(),
-                              type: 'password',
-                              data: {'is_pinned': val},
-                            );
-                          },
-                        ),
                       ],
                     ],
                   ),

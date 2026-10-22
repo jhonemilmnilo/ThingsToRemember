@@ -166,7 +166,7 @@ class SecretDrawer {
                                     height: 20,
                                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                   )
-                                : const Text('Save Changes', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                                : const Text('Save', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                           ),
                         ),
                       ] else ...[

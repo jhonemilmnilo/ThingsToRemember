@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme.dart';
 
 class DrawerComponents {
@@ -119,13 +120,26 @@ class DrawerComponents {
               if (canCopy) ...[
                 const SizedBox(width: 8),
                 GestureDetector(
-                  onTap: () {
+                  onTap: () async {
+                    await Clipboard.setData(ClipboardData(text: value));
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).clearSnackBars();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         backgroundColor: AppColors.primaryMatcha,
                         behavior: SnackBarBehavior.floating,
-                        duration: const Duration(seconds: 1),
-                        content: Text('Copied $label to clipboard!'),
+                        duration: const Duration(seconds: 2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        content: Row(
+                          children: [
+                            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                            const SizedBox(width: 10),
+                            Text(
+                              '$label copied to clipboard!',
+                              style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },

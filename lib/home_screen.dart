@@ -199,48 +199,50 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildModalInput(controller: field3, label: 'Relationship (e.g. Mother, Brother)'),
                   ],
 
-                  const SizedBox(height: 14),
+                  if (type != 'password') ...[
+                    const SizedBox(height: 14),
 
-                  // 📌 Clean Text & Toggle (No Card Box)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Pin to Top',
-                              style: TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
+                    // 📌 Clean Text & Toggle (No Card Box)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Pin to Top',
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Keep this priority item at the top',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isPinned ? AppColors.primaryMatcha : AppColors.textMuted,
-                                fontWeight: FontWeight.w500,
+                              const SizedBox(height: 2),
+                              Text(
+                                'Keep this priority item at the top',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isPinned ? AppColors.primaryMatcha : AppColors.textMuted,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        Switch.adaptive(
-                          value: isPinned,
-                          activeTrackColor: AppColors.primaryMatcha,
-                          onChanged: (val) {
-                            setModalState(() {
-                              isPinned = val;
-                            });
-                          },
-                        ),
-                      ],
+                            ],
+                          ),
+                          Switch.adaptive(
+                            value: isPinned,
+                            activeTrackColor: AppColors.primaryMatcha,
+                            onChanged: (val) {
+                              setModalState(() {
+                                isPinned = val;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
 
                   const SizedBox(height: 16),
 
@@ -254,9 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           return;
                         }
 
-                        Map<String, dynamic> itemData = {
-                          'is_pinned': isPinned,
-                        };
+                        Map<String, dynamic> itemData = {};
                         if (type == 'password') {
                           itemData.addAll({
                             'title': field1.text.trim(),
@@ -268,18 +268,21 @@ class _HomeScreenState extends State<HomeScreen> {
                           itemData.addAll({
                             'title': field1.text.trim(),
                             'content': field2.text.trim(),
+                            'is_pinned': isPinned,
                           });
                         } else if (type == 'contact') {
                           itemData.addAll({
                             'name': field1.text.trim(),
                             'phone_number': field2.text.trim(),
                             'relationship': field3.text.trim(),
+                            'is_pinned': isPinned,
                           });
                         } else if (type == 'birthday') {
                           itemData.addAll({
                             'name': field1.text.trim(),
                             'birthdate': field2.text.trim().isEmpty ? '2000-01-01' : field2.text.trim(),
                             'relationship': field3.text.trim(),
+                            'is_pinned': isPinned,
                           });
                         }
 
@@ -299,7 +302,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
-                      child: const Text('Save to Neon Vault', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                      child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                     ),
                   ),
                 ],
@@ -714,7 +717,6 @@ class _HomeScreenState extends State<HomeScreen> {
       item: item,
       userId: _activeUserId!,
       onSaved: () => _reSortListAndNotify(_passwords, 'Changes saved successfully!'),
-      onPinnedToggled: () => _reSortListAndNotify(_passwords, null),
     );
   }
 
