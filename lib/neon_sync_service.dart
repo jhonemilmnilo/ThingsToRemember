@@ -145,6 +145,9 @@ class NeonSyncService {
         if (decoded['success'] == true) {
           return decoded;
         }
+      } else if (response.statusCode == 401) {
+        // 🚨 Session Token is expired, invalid, or tampered
+        return {'unauthorized': true, 'error': 'Session expired'};
       }
       return null;
     } catch (_) {

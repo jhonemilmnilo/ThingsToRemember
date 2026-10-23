@@ -14,6 +14,8 @@ import 'modals/add_contact_modal.dart';
 import 'modals/add_birthday_modal.dart';
 import 'modals/add_wifi_modal.dart';
 import 'modals/delete_confirmation_modal.dart';
+import 'modals/master_password_modal.dart';
+import 'services/biometric_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userName;
@@ -68,6 +70,44 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (!mounted) return;
 
+    // 🚨 Handle 401 Unauthorized (Expired or Invalid Session Token)
+    if (result != null && result['unauthorized'] == true) {
+      debugPrint('🚨 Session token expired or invalid. Purging keystore & requesting re-auth.');
+      await BiometricService.clearStoredSession();
+      NeonSyncService.clearSession();
+
+      setState(() => _isLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.alertPersimmon,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          content: const Text(
+            'Session expired for your security. Please enter your Master Password.',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+
+      // Re-prompt Master Password Modal to mint a fresh token
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogCtx) => MasterPasswordModal(
+          email: widget.userEmail,
+          userName: widget.userName,
+          userId: _activeUserId,
+          isSetupMode: false,
+          onAuthenticated: () {
+            // Once re-authenticated with fresh token, reload vault!
+            _loadVaultData();
+          },
+        ),
+      );
+      return;
+    }
+
     if (result != null) {
       setState(() {
         _activeUserId = result['userId'] ?? _activeUserId;
@@ -84,6 +124,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _handleLogout() async {
+    // 🛡️ Explicitly wipe hardware Keystore credentials on logout
+    await BiometricService.clearStoredSession();
     NeonSyncService.clearSession();
     try {
       await GoogleSignIn().signOut();
