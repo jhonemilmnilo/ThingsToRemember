@@ -33,10 +33,16 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _selectedTabIndex = 0;
   bool _isLoading = true;
   String? _activeUserId;
+
+  // 🔒 Phase 5: Auto-Lock & Background Inactivity Shield
+  DateTime? _pausedTimestamp;
+  bool _isVaultLocked = false;
+  bool _isAuthenticating = false;
+  static const Duration _autoLockThreshold = Duration(seconds: 45); // 45 seconds dormancy threshold
 
   // Real Database Lists
   List<dynamic> _passwords = [];
@@ -57,8 +63,90 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _activeUserId = widget.userId;
     _loadVaultData();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    if (state == AppLifecycleState.paused) {
+      // ⏸️ App minimized or phone screen turned off
+      if (!_isAuthenticating && !_isVaultLocked) {
+        _pausedTimestamp = DateTime.now();
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      // ▶️ User returned to the app
+      if (_pausedTimestamp != null) {
+        final elapsed = DateTime.now().difference(_pausedTimestamp!);
+        _pausedTimestamp = null;
+
+        if (elapsed >= _autoLockThreshold && !_isVaultLocked) {
+          debugPrint('🔒 Auto-lock triggered! Background dormancy: ${elapsed.inSeconds}s');
+          setState(() {
+            _isVaultLocked = true;
+          });
+          _triggerUnlock();
+        }
+      }
+    }
+  }
+
+  /// Trigger biometric or master password prompt to unlock the shielded vault
+  Future<void> _triggerUnlock() async {
+    if (_isAuthenticating) return;
+    _isAuthenticating = true;
+
+    try {
+      final isDeviceSecAvailable = await BiometricService.isDeviceSecurityAvailable();
+      final storedToken = await BiometricService.getStoredSessionToken(widget.userEmail);
+
+      if (isDeviceSecAvailable && storedToken != null) {
+        final authenticated = await BiometricService.authenticateWithDeviceSecurity(
+          reason: 'Unlock PassKeep to access your secured vault',
+        );
+
+        if (authenticated) {
+          if (!mounted) return;
+          setState(() {
+            _isVaultLocked = false;
+          });
+          _isAuthenticating = false;
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error during auto-lock biometric unlock: $e');
+    }
+
+    _isAuthenticating = false;
+
+    // Fallback to Master Password Modal if biometrics failed or cancelled
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => MasterPasswordModal(
+        email: widget.userEmail,
+        userName: widget.userName,
+        userId: _activeUserId,
+        isSetupMode: false,
+        onAuthenticated: () {
+          if (!mounted) return;
+          setState(() {
+            _isVaultLocked = false;
+          });
+        },
+      ),
+    );
   }
 
   Future<void> _loadVaultData() async {
@@ -296,34 +384,105 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 16),
 
-            // 📋 3. Dynamic Real List from Neon
+            // 📋 3. Dynamic Real List from Neon OR 🔒 Privacy Shield when locked
             Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryMatcha),
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadVaultData,
-                      color: AppColors.primaryMatcha,
-                      child: _buildCurrentList(),
-                    ),
+              child: _isVaultLocked
+                  ? _buildLockedPrivacyShield()
+                  : _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryMatcha),
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _loadVaultData,
+                          color: AppColors.primaryMatcha,
+                          child: _buildCurrentList(),
+                        ),
             ),
           ],
         ),
       ),
 
-      // ➕ Floating Action Button for Adding Data (Text-Only Label)
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddItemModal,
-        backgroundColor: AppColors.primaryMatcha,
-        elevation: 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        label: const Text(
-          'Add',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+      // ➕ Floating Action Button for Adding Data (Hidden when Vault is Locked)
+      floatingActionButton: _isVaultLocked
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _showAddItemModal,
+              backgroundColor: AppColors.primaryMatcha,
+              elevation: 3,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              label: const Text(
+                'Add',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+            ),
+    );
+  }
+
+  /// 🔒 Privacy Shield Widget displayed when Auto-Lock is engaged
+  Widget _buildLockedPrivacyShield() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // 🍵 Monolith Architectural Emblem (No literal lock/key)
+            SizedBox(
+              width: 84,
+              height: 84,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset(
+                  'assets/icon/app_icon.png',
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Vault Locked',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'PassKeep automatically locked your vault due to inactivity to protect your credentials.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13.5,
+                color: AppColors.textMuted,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 28),
+            ElevatedButton(
+              onPressed: _triggerUnlock,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryMatcha,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 2,
+              ),
+              child: const Text(
+                'Unlock Vault',
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

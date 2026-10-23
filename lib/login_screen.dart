@@ -145,32 +145,19 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const Spacer(flex: 2),
 
-              // 🍵 Branding Container (Matcha Padlock with Pistachio & Sage borders)
-              Container(
-                width: 110,
-                height: 110,
-                decoration: BoxDecoration(
-                  color: AppColors.cardSurface,
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: AppColors.pistachioMint, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primaryMatcha.withValues(alpha: 0.12),
-                      blurRadius: 32,
-                      offset: const Offset(0, 12),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(12),
+              // 🍵 Modern Frameless Monolith Logo
+              SizedBox(
+                width: 90,
+                height: 90,
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(22),
                   child: Image.asset(
                     'assets/icon/app_icon.png',
                     fit: BoxFit.cover,
                   ),
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               // Title & Subtitle with high-contrast forest text
               const Text(
