@@ -4,6 +4,7 @@ import 'theme.dart';
 import 'home_screen.dart';
 import 'neon_sync_service.dart';
 import 'modals/master_password_modal.dart';
+import 'services/biometric_service.dart';
 
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -34,6 +35,8 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _isLoading = false);
 
       if (account != null) {
+        debugPrint('👤 Google Account selected: ${account.email}');
+
         // 🐘 Direct Neon Postgres Database Sync via Cloudflare Worker
         final syncedUser = await NeonSyncService.syncUser(
           email: account.email,
@@ -41,9 +44,46 @@ class _LoginScreenState extends State<LoginScreen> {
           provider: 'google',
         );
 
+        debugPrint('🐘 Synced user response: $syncedUser');
+
         if (!mounted) return;
 
+        // 👆 1. Check if user already has a saved session token & device security enabled (wrapped in safe try-catch)
+        try {
+          final isDeviceSecAvailable = await BiometricService.isDeviceSecurityAvailable();
+          final storedToken = await BiometricService.getStoredSessionToken(account.email);
+
+          debugPrint('👆 Device security status: available=$isDeviceSecAvailable, hasToken=${storedToken != null}');
+
+          if (storedToken != null && isDeviceSecAvailable) {
+            final authenticated = await BiometricService.authenticateWithDeviceSecurity(
+              reason: 'Unlock PassKeep using Fingerprint, Face, or Phone PIN',
+            );
+
+            if (authenticated) {
+              NeonSyncService.setSessionToken(storedToken);
+              if (!mounted) return;
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => HomeScreen(
+                    userName: account.displayName ?? 'Jhon Emil',
+                    userEmail: account.email,
+                    userId: syncedUser?['id'],
+                  ),
+                ),
+              );
+              return;
+            }
+          }
+        } catch (secError) {
+          debugPrint('⚠️ Device security check error, falling back to modal: $secError');
+        }
+
+        // 🔑 2. Fallback to Master Password Modal if no biometrics or user chose password
+        if (!mounted) return;
         final bool hasMasterPassword = syncedUser?['has_master_password'] == true;
+
+        debugPrint('🔑 Opening MasterPasswordModal: isSetupMode=${!hasMasterPassword}');
 
         showDialog(
           context: context,

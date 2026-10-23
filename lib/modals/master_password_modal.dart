@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme.dart';
 import '../neon_sync_service.dart';
+import '../services/biometric_service.dart';
 
 class MasterPasswordModal extends StatefulWidget {
   final String email;
@@ -94,6 +95,20 @@ class _MasterPasswordModalState extends State<MasterPasswordModal> {
       setState(() => _isSubmitting = false);
 
       if (result['verified'] == true) {
+        // Save session token in hardware Keystore if device security (fingerprint/PIN/pattern) is available
+        if (NeonSyncService.sessionToken != null) {
+          try {
+            final isDeviceSecAvailable = await BiometricService.isDeviceSecurityAvailable();
+            if (isDeviceSecAvailable) {
+              await BiometricService.saveSessionToken(
+                email: widget.email,
+                token: NeonSyncService.sessionToken!,
+              );
+            }
+          } catch (_) {}
+        }
+
+        if (!mounted) return;
         Navigator.of(context).pop();
         widget.onAuthenticated();
       } else {

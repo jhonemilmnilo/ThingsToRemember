@@ -14,6 +14,11 @@ class NeonSyncService {
   /// Current session token getter
   static String? get sessionToken => _sessionToken;
 
+  /// Set session token directly (e.g. from Biometric Keystore)
+  static void setSessionToken(String token) {
+    _sessionToken = token;
+  }
+
   /// Clear token on logout
   static void clearSession() {
     _sessionToken = null;
