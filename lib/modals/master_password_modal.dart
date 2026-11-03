@@ -79,6 +79,17 @@ class _MasterPasswordModalState extends State<MasterPasswordModal> {
       setState(() => _isSubmitting = false);
 
       if (success) {
+        if (NeonSyncService.sessionToken != null) {
+          try {
+            await BiometricService.saveSessionToken(
+              email: widget.email,
+              token: NeonSyncService.sessionToken!,
+              name: widget.userName,
+              userId: widget.userId,
+            );
+          } catch (_) {}
+        }
+        if (!mounted) return;
         Navigator.of(context).pop();
         widget.onAuthenticated();
       } else {
@@ -98,16 +109,16 @@ class _MasterPasswordModalState extends State<MasterPasswordModal> {
         // Save session token in hardware Keystore if device security (fingerprint/PIN/pattern) is available
         if (NeonSyncService.sessionToken != null) {
           try {
-            final isDeviceSecAvailable = await BiometricService.isDeviceSecurityAvailable();
-            if (isDeviceSecAvailable) {
-              await BiometricService.saveSessionToken(
-                email: widget.email,
-                token: NeonSyncService.sessionToken!,
-              );
-            }
+            await BiometricService.saveSessionToken(
+              email: widget.email,
+              token: NeonSyncService.sessionToken!,
+              name: widget.userName,
+              userId: widget.userId,
+            );
           } catch (_) {}
         }
 
+        if (!mounted) return;
         if (!mounted) return;
         Navigator.of(context).pop();
         widget.onAuthenticated();

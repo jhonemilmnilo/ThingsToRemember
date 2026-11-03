@@ -16,6 +16,8 @@ class BiometricService {
 
   static const String _keySessionToken = 'passkeep_session_token';
   static const String _keyUserEmail = 'passkeep_user_email';
+  static const String _keyUserName = 'passkeep_user_name';
+  static const String _keyUserId = 'passkeep_user_id';
   static const String _keyBiometricEnabled = 'passkeep_biometric_enabled';
 
   /// Check if device supports ANY screen lock (Fingerprint, Face, PIN, Pattern, or Password)
@@ -48,32 +50,62 @@ class BiometricService {
     }
   }
 
-  /// Store session token in hardware keystore
+  /// Store session token and user profile in hardware keystore
   static Future<void> saveSessionToken({
     required String email,
     required String token,
+    String? name,
+    String? userId,
   }) async {
     await _storage.write(key: _keySessionToken, value: token);
     await _storage.write(key: _keyUserEmail, value: email);
+    if (name != null) await _storage.write(key: _keyUserName, value: name);
+    if (userId != null) await _storage.write(key: _keyUserId, value: userId);
     await _storage.write(key: _keyBiometricEnabled, value: 'true');
   }
 
+  /// Check if an active signed-in session exists on device
+  static Future<bool> hasActiveSession() async {
+    final String? email = await _storage.read(key: _keyUserEmail);
+    final String? token = await _storage.read(key: _keySessionToken);
+    return email != null && email.isNotEmpty && token != null && token.isNotEmpty;
+  }
+
+  /// Get stored user profile
+  static Future<Map<String, String?>> getStoredUserProfile() async {
+    final email = await _storage.read(key: _keyUserEmail);
+    final name = await _storage.read(key: _keyUserName);
+    final userId = await _storage.read(key: _keyUserId);
+    final token = await _storage.read(key: _keySessionToken);
+    return {
+      'email': email,
+      'name': name,
+      'userId': userId,
+      'token': token,
+    };
+  }
+
   /// Get stored session token for the user
-  static Future<String?> getStoredSessionToken(String email) async {
+  static Future<String?> getStoredSessionToken([String? email]) async {
     final String? isEnabled = await _storage.read(key: _keyBiometricEnabled);
     if (isEnabled != 'true') return null;
 
-    final String? storedEmail = await _storage.read(key: _keyUserEmail);
-    if (storedEmail != email) return null;
+    if (email != null) {
+      final String? storedEmail = await _storage.read(key: _keyUserEmail);
+      if (storedEmail != email) return null;
+    }
 
     return await _storage.read(key: _keySessionToken);
   }
 
   /// Check if user has device security enabled
-  static Future<bool> isDeviceSecurityEnabled(String email) async {
+  static Future<bool> isDeviceSecurityEnabled([String? email]) async {
     final String? isEnabled = await _storage.read(key: _keyBiometricEnabled);
-    final String? storedEmail = await _storage.read(key: _keyUserEmail);
-    return isEnabled == 'true' && storedEmail == email;
+    if (email != null) {
+      final String? storedEmail = await _storage.read(key: _keyUserEmail);
+      return isEnabled == 'true' && storedEmail == email;
+    }
+    return isEnabled == 'true';
   }
 
   /// Clear stored credentials on logout
@@ -81,5 +113,7 @@ class BiometricService {
     await _storage.delete(key: _keySessionToken);
     await _storage.delete(key: _keyBiometricEnabled);
     await _storage.delete(key: _keyUserEmail);
+    await _storage.delete(key: _keyUserName);
+    await _storage.delete(key: _keyUserId);
   }
 }

@@ -25,10 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 🚀 Force fresh account selection every time (No-Cache)
-      await _googleSignIn.signOut();
-
-      // Native Android Google Account Picker
+      // Native Android Google Account Picker (preserves existing signed-in account if present)
       final GoogleSignInAccount? account = await _googleSignIn.signIn();
 
       if (!mounted) return;
@@ -62,6 +59,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
             if (authenticated) {
               NeonSyncService.setSessionToken(storedToken);
+              // Ensure full profile is saved for subsequent launches
+              await BiometricService.saveSessionToken(
+                email: account.email,
+                token: storedToken,
+                name: account.displayName,
+                userId: syncedUser?['id'],
+              );
               if (!mounted) return;
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(

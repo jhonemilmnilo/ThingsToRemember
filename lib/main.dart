@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'theme.dart';
-import 'login_screen.dart';
+import 'auth_gate_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const PassKeepApp());
 }
 
@@ -15,7 +16,7 @@ class PassKeepApp extends StatelessWidget {
       title: 'PassKeep',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const LoginScreen(),
+      home: const AuthGateScreen(),
     );
   }
 }
