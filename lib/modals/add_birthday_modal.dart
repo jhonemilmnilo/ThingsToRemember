@@ -190,6 +190,7 @@ class AddBirthdayModal {
                       userId: userId,
                       type: 'birthday',
                       data: {
+                        'id': newId,
                         'name': nameCtrl.text.trim(),
                         'birthdate': birthdateStr,
                         'relationship': relCtrl.text.trim(),

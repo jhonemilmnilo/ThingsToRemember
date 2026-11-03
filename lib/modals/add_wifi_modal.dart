@@ -161,6 +161,7 @@ class AddWifiModal {
                             userId: userId,
                             type: 'wifi',
                             data: {
+                              'id': newId,
                               'ssid': ssidCtrl.text.trim(),
                               'password': passwordCtrl.text.trim(),
                               'security_type': securityType,

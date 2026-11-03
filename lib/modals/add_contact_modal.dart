@@ -91,6 +91,7 @@ class AddContactModal {
                       userId: userId,
                       type: 'contact',
                       data: {
+                        'id': newId,
                         'name': nameCtrl.text.trim(),
                         'phone_number': phoneCtrl.text.trim(),
                         'relationship': relCtrl.text.trim(),

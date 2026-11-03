@@ -86,6 +86,7 @@ class AddSecretModal {
                           userId: userId,
                           type: 'secret',
                           data: {
+                            'id': newId,
                             'title': titleCtrl.text.trim(),
                             'content': contentCtrl.text.trim(),
                             'is_pinned': isPinned,

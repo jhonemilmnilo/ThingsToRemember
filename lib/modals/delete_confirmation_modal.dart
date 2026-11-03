@@ -132,20 +132,13 @@ class DeleteConfirmationModal {
                                   if (type == 'birthday') table = 'local_family_members';
                                   if (type == 'wifi') table = 'local_wifi_networks';
 
-                                  // 1. HARD DELETE directly from SQLite so it disappears 100% immediately!
+                                  // 1. HARD DELETE directly from SQLite so it disappears from disk
                                   await LocalVaultDb.instance.hardDeleteItem(
                                     table: table,
                                     id: itemId,
                                   );
 
-                                  // 2. Trigger UI callback right away
-                                  onDeleted();
-
-                                  if (context.mounted) {
-                                    Navigator.of(modalContext).pop();
-                                  }
-
-                                  // 3. Delete from Neon in the background
+                                  // 2. Also delete from Neon cloud server so pull won't resurrect it
                                   try {
                                     await NeonSyncService.deleteVaultItem(
                                       userId: userId,
@@ -153,6 +146,14 @@ class DeleteConfirmationModal {
                                       type: type,
                                     );
                                   } catch (_) {}
+
+                                  // 3. Pop the confirmation modal first
+                                  if (context.mounted) {
+                                    Navigator.of(modalContext).pop();
+                                  }
+
+                                  // 4. Trigger UI callback to refresh state immediately
+                                  onDeleted();
                                 },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.alertPersimmon,

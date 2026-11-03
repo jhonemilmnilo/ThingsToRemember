@@ -206,7 +206,7 @@ class NeonSyncService {
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
-        return decoded['success'] == true;
+        return decoded['success'] == true && decoded['item'] != null;
       }
       return false;
     } catch (_) {

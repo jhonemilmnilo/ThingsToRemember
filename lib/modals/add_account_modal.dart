@@ -93,6 +93,7 @@ class AddAccountModal {
                         'username_or_email': userCtrl.text.trim(),
                         'encrypted_password': passCtrl.text.trim(),
                         'iv': 'local_plain',
+                        'notes': notesCtrl.text.trim(),
                         'website_url': notesCtrl.text.trim(),
                         'is_pinned': 0,
                       };
@@ -111,6 +112,7 @@ class AddAccountModal {
                           userId: userId,
                           type: 'password',
                           data: {
+                            'id': newId,
                             'title': titleCtrl.text.trim(),
                             'username_or_email': userCtrl.text.trim(),
                             'password': passCtrl.text.trim(),

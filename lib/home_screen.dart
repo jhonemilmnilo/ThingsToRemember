@@ -693,20 +693,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       itemId: itemId,
       userId: _activeUserId!,
       onDeleted: () async {
-        // 1. Immediately engage skeleton loading feedback
+        // 1. Instantly remove from memory list and notify state so card vanishes with zero lag
         setState(() {
-          _isLoading = true;
           targetList.removeWhere((element) => element['id'].toString() == itemId);
         });
 
-        // 2. Fetch fresh snapshot from local SQLite
+        // 2. Fetch fresh snapshot from local SQLite to ensure full list integrity
         await _loadVaultData();
 
         if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               backgroundColor: AppColors.primaryMatcha,

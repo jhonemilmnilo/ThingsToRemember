@@ -192,39 +192,50 @@ class VaultSyncCoordinator {
         payload.remove('is_synced');
         payload.remove('is_deleted');
 
-        final updated = await NeonSyncService.updateVaultItem(
+        // Ensure password field matches worker's expectation
+        if (type == 'password' && payload.containsKey('encrypted_password') && !payload.containsKey('password')) {
+          payload['password'] = payload['encrypted_password'];
+        }
+
+        // Pass client generated id so Neon uses the EXACT same id
+        payload['id'] = id;
+
+        // First attempt: try create (using client generated UUID)
+        final createdItem = await NeonSyncService.createVaultItem(
           userId: userId,
-          itemId: id,
           type: type,
           data: payload,
         );
 
-        if (updated) {
-          successfullySyncedIds.add(id);
+        if (createdItem != null && createdItem['id'] != null) {
+          final serverId = createdItem['id'].toString();
+          if (serverId != id) {
+            // In case server generated a different ID, replace local item cleanly
+            final db = await _db.database;
+            await db.delete(tableName, where: 'id = ?', whereArgs: [id]);
+            final Map<String, dynamic> cleanRow = Map<String, dynamic>.from(item);
+            cleanRow['id'] = serverId;
+            cleanRow['is_synced'] = 1;
+            cleanRow.remove('password');
+            await _db.upsertLocalItem(
+              table: tableName,
+              row: cleanRow,
+              markDirty: false,
+            );
+          } else {
+            successfullySyncedIds.add(id);
+          }
           successCount++;
         } else {
-          // If update failed (e.g. item doesn't exist on server yet), try create
-          final createdItem = await NeonSyncService.createVaultItem(
+          // If create failed (e.g. item already exists on Neon), try update
+          final updated = await NeonSyncService.updateVaultItem(
             userId: userId,
+            itemId: id,
             type: type,
             data: payload,
           );
-          if (createdItem != null) {
-            final serverId = createdItem['id']?.toString();
-            if (serverId != null && serverId != id) {
-              // Replace local temporary UUID with server generated UUID to prevent duplicates
-              final db = await _db.database;
-              await db.delete(tableName, where: 'id = ?', whereArgs: [id]);
-              payload['id'] = serverId;
-              payload['is_synced'] = 1;
-              await _db.upsertLocalItem(
-                table: tableName,
-                row: payload,
-                markDirty: false,
-              );
-            } else {
-              successfullySyncedIds.add(id);
-            }
+          if (updated) {
+            successfullySyncedIds.add(id);
             successCount++;
           }
         }

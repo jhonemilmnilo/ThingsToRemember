@@ -324,39 +324,114 @@ export default {
         const masterKey = env.AES_VAULT_MASTER_KEY;
 
         let inserted;
+        const itemId = data.id || null;
+
         if (type === 'password') {
           const cipherPass = await encryptVaultField(data.password, masterKey);
-          inserted = await sql`
-            INSERT INTO credentials (user_id, title, username_or_email, encrypted_password, notes, is_pinned)
-            VALUES (${userId}, ${data.title}, ${data.username_or_email}, ${cipherPass}, ${data.notes || null}, ${data.is_pinned ?? false})
-            RETURNING *;
-          `;
+          if (itemId) {
+            inserted = await sql`
+              INSERT INTO credentials (id, user_id, title, username_or_email, encrypted_password, notes, is_pinned)
+              VALUES (${itemId}, ${userId}, ${data.title}, ${data.username_or_email}, ${cipherPass}, ${data.notes || null}, ${data.is_pinned ?? false})
+              ON CONFLICT (id) DO UPDATE SET
+                title = EXCLUDED.title,
+                username_or_email = EXCLUDED.username_or_email,
+                encrypted_password = EXCLUDED.encrypted_password,
+                notes = EXCLUDED.notes,
+                is_pinned = EXCLUDED.is_pinned,
+                updated_at = NOW()
+              RETURNING *;
+            `;
+          } else {
+            inserted = await sql`
+              INSERT INTO credentials (user_id, title, username_or_email, encrypted_password, notes, is_pinned)
+              VALUES (${userId}, ${data.title}, ${data.username_or_email}, ${cipherPass}, ${data.notes || null}, ${data.is_pinned ?? false})
+              RETURNING *;
+            `;
+          }
         } else if (type === 'secret') {
           const cipherContent = await encryptVaultField(data.content, masterKey);
-          inserted = await sql`
-            INSERT INTO secure_notes (user_id, title, content, is_pinned)
-            VALUES (${userId}, ${data.title}, ${cipherContent}, ${data.is_pinned ?? false})
-            RETURNING *;
-          `;
+          if (itemId) {
+            inserted = await sql`
+              INSERT INTO secure_notes (id, user_id, title, content, is_pinned)
+              VALUES (${itemId}, ${userId}, ${data.title}, ${cipherContent}, ${data.is_pinned ?? false})
+              ON CONFLICT (id) DO UPDATE SET
+                title = EXCLUDED.title,
+                content = EXCLUDED.content,
+                is_pinned = EXCLUDED.is_pinned,
+                updated_at = NOW()
+              RETURNING *;
+            `;
+          } else {
+            inserted = await sql`
+              INSERT INTO secure_notes (user_id, title, content, is_pinned)
+              VALUES (${userId}, ${data.title}, ${cipherContent}, ${data.is_pinned ?? false})
+              RETURNING *;
+            `;
+          }
         } else if (type === 'contact') {
-          inserted = await sql`
-            INSERT INTO emergency_contacts (user_id, name, phone_number, relationship, notes, is_pinned)
-            VALUES (${userId}, ${data.name}, ${data.phone_number}, ${data.relationship || 'General'}, ${data.notes || null}, ${data.is_pinned ?? false})
-            RETURNING *;
-          `;
+          if (itemId) {
+            inserted = await sql`
+              INSERT INTO emergency_contacts (id, user_id, name, phone_number, relationship, notes, is_pinned)
+              VALUES (${itemId}, ${userId}, ${data.name}, ${data.phone_number}, ${data.relationship || 'General'}, ${data.notes || null}, ${data.is_pinned ?? false})
+              ON CONFLICT (id) DO UPDATE SET
+                name = EXCLUDED.name,
+                phone_number = EXCLUDED.phone_number,
+                relationship = EXCLUDED.relationship,
+                notes = EXCLUDED.notes,
+                is_pinned = EXCLUDED.is_pinned,
+                updated_at = NOW()
+              RETURNING *;
+            `;
+          } else {
+            inserted = await sql`
+              INSERT INTO emergency_contacts (user_id, name, phone_number, relationship, notes, is_pinned)
+              VALUES (${userId}, ${data.name}, ${data.phone_number}, ${data.relationship || 'General'}, ${data.notes || null}, ${data.is_pinned ?? false})
+              RETURNING *;
+            `;
+          }
         } else if (type === 'birthday') {
-          inserted = await sql`
-            INSERT INTO family_members (user_id, name, relationship, birthdate, notes, is_pinned)
-            VALUES (${userId}, ${data.name}, ${data.relationship || 'Family'}, ${data.birthdate}, ${data.notes || null}, ${data.is_pinned ?? false})
-            RETURNING *;
-          `;
+          if (itemId) {
+            inserted = await sql`
+              INSERT INTO family_members (id, user_id, name, relationship, birthdate, notes, is_pinned)
+              VALUES (${itemId}, ${userId}, ${data.name}, ${data.relationship || 'Family'}, ${data.birthdate}, ${data.notes || null}, ${data.is_pinned ?? false})
+              ON CONFLICT (id) DO UPDATE SET
+                name = EXCLUDED.name,
+                relationship = EXCLUDED.relationship,
+                birthdate = EXCLUDED.birthdate,
+                notes = EXCLUDED.notes,
+                is_pinned = EXCLUDED.is_pinned,
+                updated_at = NOW()
+              RETURNING *;
+            `;
+          } else {
+            inserted = await sql`
+              INSERT INTO family_members (user_id, name, relationship, birthdate, notes, is_pinned)
+              VALUES (${userId}, ${data.name}, ${data.relationship || 'Family'}, ${data.birthdate}, ${data.notes || null}, ${data.is_pinned ?? false})
+              RETURNING *;
+            `;
+          }
         } else if (type === 'wifi') {
           const cipherWifiPass = await encryptVaultField(data.password, masterKey);
-          inserted = await sql`
-            INSERT INTO wifi_networks (user_id, ssid, password, security_type, notes, is_pinned)
-            VALUES (${userId}, ${data.ssid}, ${cipherWifiPass}, ${data.security_type || 'WPA'}, ${data.notes || null}, ${data.is_pinned ?? false})
-            RETURNING *;
-          `;
+          if (itemId) {
+            inserted = await sql`
+              INSERT INTO wifi_networks (id, user_id, ssid, password, security_type, notes, is_pinned)
+              VALUES (${itemId}, ${userId}, ${data.ssid}, ${cipherWifiPass}, ${data.security_type || 'WPA'}, ${data.notes || null}, ${data.is_pinned ?? false})
+              ON CONFLICT (id) DO UPDATE SET
+                ssid = EXCLUDED.ssid,
+                password = EXCLUDED.password,
+                security_type = EXCLUDED.security_type,
+                notes = EXCLUDED.notes,
+                is_pinned = EXCLUDED.is_pinned,
+                updated_at = NOW()
+              RETURNING *;
+            `;
+          } else {
+            inserted = await sql`
+              INSERT INTO wifi_networks (user_id, ssid, password, security_type, notes, is_pinned)
+              VALUES (${userId}, ${data.ssid}, ${cipherWifiPass}, ${data.security_type || 'WPA'}, ${data.notes || null}, ${data.is_pinned ?? false})
+              RETURNING *;
+            `;
+          }
         } else {
           return Response.json({ success: false, error: 'Invalid type' }, { status: 400, headers: corsHeaders });
         }
