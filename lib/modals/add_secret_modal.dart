@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import '../services/local_vault_db.dart';
 import '../neon_sync_service.dart';
 import '../theme.dart';
 import 'modal_components.dart';
@@ -58,16 +60,59 @@ class AddSecretModal {
                   ModalComponents.submitButton(
                     onPressed: () async {
                       Navigator.pop(ctx);
-                      await NeonSyncService.createVaultItem(
-                        userId: userId,
-                        type: 'secret',
-                        data: {
-                          'title': titleCtrl.text.trim(),
-                          'content': contentCtrl.text.trim(),
-                          'is_pinned': isPinned,
-                        },
+                      final newId = const Uuid().v4();
+                      final nowIso = DateTime.now().toIso8601String();
+                      final payload = {
+                        'id': newId,
+                        'user_id': userId,
+                        'title': titleCtrl.text.trim(),
+                        'content': contentCtrl.text.trim(),
+                        'is_pinned': isPinned ? 1 : 0,
+                        'created_at': nowIso,
+                        'updated_at': nowIso,
+                      };
+
+                      // 1. Instant Local Save with is_synced = 0
+                      await LocalVaultDb.instance.upsertLocalItem(
+                        table: 'local_secure_notes',
+                        row: payload,
+                        markDirty: true,
                       );
                       onAdded();
+
+                      // 2. Silent Cloud Push if connected
+                      try {
+                        final createdItem = await NeonSyncService.createVaultItem(
+                          userId: userId,
+                          type: 'secret',
+                          data: {
+                            'title': titleCtrl.text.trim(),
+                            'content': contentCtrl.text.trim(),
+                            'is_pinned': isPinned,
+                          },
+                        );
+                        if (createdItem != null && createdItem['id'] != null) {
+                          final serverId = createdItem['id'].toString();
+                          if (serverId != newId) {
+                            final db = await LocalVaultDb.instance.database;
+                            await db.delete('local_secure_notes', where: 'id = ?', whereArgs: [newId]);
+                            payload['id'] = serverId;
+                            payload['content'] = createdItem['content'] ?? contentCtrl.text.trim();
+                            await LocalVaultDb.instance.upsertLocalItem(
+                              table: 'local_secure_notes',
+                              row: payload,
+                              markDirty: false,
+                            );
+                          } else {
+                            await LocalVaultDb.instance.markBatchSynced(
+                              table: 'local_secure_notes',
+                              activeIds: [newId],
+                              deletedIds: [],
+                            );
+                          }
+                          onAdded();
+                        }
+                      } catch (_) {}
                     },
                   ),
                 ],

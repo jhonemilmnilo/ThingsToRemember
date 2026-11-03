@@ -197,6 +197,21 @@ class LocalVaultDb {
   }
 
   // ==========================================
+  // 🗑️ HARD DELETE ITEM (Permanently remove row immediately)
+  // ==========================================
+  Future<void> hardDeleteItem({
+    required String table,
+    required String id,
+  }) async {
+    final db = await database;
+    await db.delete(
+      table,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // ==========================================
   // 🗑️ SOFT DELETE ITEM (Queues for cloud sync)
   // ==========================================
   Future<void> softDeleteItem({

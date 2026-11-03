@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import '../services/local_vault_db.dart';
 import '../neon_sync_service.dart';
 import '../theme.dart';
 import 'modal_components.dart';
@@ -131,17 +133,62 @@ class AddWifiModal {
                         if (ssidCtrl.text.trim().isEmpty) return;
 
                         Navigator.pop(ctx);
-                        await NeonSyncService.createVaultItem(
-                          userId: userId,
-                          type: 'wifi',
-                          data: {
-                            'ssid': ssidCtrl.text.trim(),
-                            'password': passwordCtrl.text.trim(),
-                            'security_type': securityType,
-                            'notes': notesCtrl.text.trim(),
-                          },
+                        final newId = const Uuid().v4();
+                        final nowIso = DateTime.now().toIso8601String();
+                        final payload = {
+                          'id': newId,
+                          'user_id': userId,
+                          'ssid': ssidCtrl.text.trim(),
+                          'password': passwordCtrl.text.trim(),
+                          'security_type': securityType,
+                          'notes': notesCtrl.text.trim(),
+                          'is_pinned': 0,
+                          'created_at': nowIso,
+                          'updated_at': nowIso,
+                        };
+
+                        // 1. Instant Local Save with is_synced = 0
+                        await LocalVaultDb.instance.upsertLocalItem(
+                          table: 'local_wifi_networks',
+                          row: payload,
+                          markDirty: true,
                         );
                         onAdded();
+
+                        // 2. Silent Cloud Push if connected
+                        try {
+                          final createdItem = await NeonSyncService.createVaultItem(
+                            userId: userId,
+                            type: 'wifi',
+                            data: {
+                              'ssid': ssidCtrl.text.trim(),
+                              'password': passwordCtrl.text.trim(),
+                              'security_type': securityType,
+                              'notes': notesCtrl.text.trim(),
+                            },
+                          );
+                          if (createdItem != null && createdItem['id'] != null) {
+                            final serverId = createdItem['id'].toString();
+                            if (serverId != newId) {
+                              final db = await LocalVaultDb.instance.database;
+                              await db.delete('local_wifi_networks', where: 'id = ?', whereArgs: [newId]);
+                              payload['id'] = serverId;
+                              payload['password'] = createdItem['password'] ?? passwordCtrl.text.trim();
+                              await LocalVaultDb.instance.upsertLocalItem(
+                                table: 'local_wifi_networks',
+                                row: payload,
+                                markDirty: false,
+                              );
+                            } else {
+                              await LocalVaultDb.instance.markBatchSynced(
+                                table: 'local_wifi_networks',
+                                activeIds: [newId],
+                                deletedIds: [],
+                              );
+                            }
+                            onAdded();
+                          }
+                        } catch (_) {}
                       },
                     ),
                   ],

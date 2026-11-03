@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import '../services/local_vault_db.dart';
 import '../neon_sync_service.dart';
 import '../theme.dart';
 import 'modal_components.dart';
@@ -61,17 +63,61 @@ class AddContactModal {
               ModalComponents.submitButton(
                 onPressed: () async {
                   Navigator.pop(ctx);
-                  await NeonSyncService.createVaultItem(
-                    userId: userId,
-                    type: 'contact',
-                    data: {
-                      'name': nameCtrl.text.trim(),
-                      'phone_number': phoneCtrl.text.trim(),
-                      'relationship': relCtrl.text.trim(),
-                      'notes': notesCtrl.text.trim(),
-                    },
+                  final newId = const Uuid().v4();
+                  final nowIso = DateTime.now().toIso8601String();
+                  final payload = {
+                    'id': newId,
+                    'user_id': userId,
+                    'name': nameCtrl.text.trim(),
+                    'phone_number': phoneCtrl.text.trim(),
+                    'relationship': relCtrl.text.trim(),
+                    'notes': notesCtrl.text.trim(),
+                    'is_pinned': 0,
+                    'created_at': nowIso,
+                    'updated_at': nowIso,
+                  };
+
+                  // 1. Instant Local Save with is_synced = 0
+                  await LocalVaultDb.instance.upsertLocalItem(
+                    table: 'local_emergency_contacts',
+                    row: payload,
+                    markDirty: true,
                   );
                   onAdded();
+
+                  // 2. Silent Cloud Push if connected
+                  try {
+                    final createdItem = await NeonSyncService.createVaultItem(
+                      userId: userId,
+                      type: 'contact',
+                      data: {
+                        'name': nameCtrl.text.trim(),
+                        'phone_number': phoneCtrl.text.trim(),
+                        'relationship': relCtrl.text.trim(),
+                        'notes': notesCtrl.text.trim(),
+                      },
+                    );
+                    if (createdItem != null && createdItem['id'] != null) {
+                      final serverId = createdItem['id'].toString();
+                      if (serverId != newId) {
+                        final db = await LocalVaultDb.instance.database;
+                        await db.delete('local_emergency_contacts', where: 'id = ?', whereArgs: [newId]);
+                        payload['id'] = serverId;
+                        await LocalVaultDb.instance.upsertLocalItem(
+                          table: 'local_emergency_contacts',
+                          row: payload,
+                          markDirty: false,
+                        );
+                      } else {
+                        await LocalVaultDb.instance.markBatchSynced(
+                          table: 'local_emergency_contacts',
+                          activeIds: [newId],
+                          deletedIds: [],
+                        );
+                      }
+                      onAdded();
+                    }
+                  } catch (_) {}
                 },
               ),
             ],

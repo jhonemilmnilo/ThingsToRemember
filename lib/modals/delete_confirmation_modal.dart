@@ -132,34 +132,27 @@ class DeleteConfirmationModal {
                                   if (type == 'birthday') table = 'local_family_members';
                                   if (type == 'wifi') table = 'local_wifi_networks';
 
-                                  // 1. Soft delete locally immediately (so UI and SQLite are clean)
-                                  await LocalVaultDb.instance.softDeleteItem(
+                                  // 1. HARD DELETE directly from SQLite so it disappears 100% immediately!
+                                  await LocalVaultDb.instance.hardDeleteItem(
                                     table: table,
                                     id: itemId,
                                   );
 
-                                  // 2. Try deleting from Neon
-                                  try {
-                                    final success = await NeonSyncService.deleteVaultItem(
-                                      userId: userId,
-                                      itemId: itemId,
-                                      type: type,
-                                    );
-                                    if (success) {
-                                      // Purge from SQLite permanently
-                                      await LocalVaultDb.instance.markBatchSynced(
-                                        table: table,
-                                        activeIds: [],
-                                        deletedIds: [itemId],
-                                      );
-                                    }
-                                  } catch (_) {}
+                                  // 2. Trigger UI callback right away
+                                  onDeleted();
 
                                   if (context.mounted) {
                                     Navigator.of(modalContext).pop();
                                   }
 
-                                  onDeleted();
+                                  // 3. Delete from Neon in the background
+                                  try {
+                                    await NeonSyncService.deleteVaultItem(
+                                      userId: userId,
+                                      itemId: itemId,
+                                      type: type,
+                                    );
+                                  } catch (_) {}
                                 },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.alertPersimmon,

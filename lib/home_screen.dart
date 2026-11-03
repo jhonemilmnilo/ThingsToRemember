@@ -603,6 +603,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     switch (_selectedTabIndex) {
       case 0:
         return AccountsTabView(
+          key: ValueKey('accounts_${_passwords.length}_$_isLoading'),
           items: _passwords,
           userId: _activeUserId,
           onSaved: () => _reSortListAndNotify(_passwords, 'Changes saved successfully!'),
@@ -616,6 +617,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         );
       case 1:
         return SecretsTabView(
+          key: ValueKey('secrets_${_secrets.length}_$_isLoading'),
           items: _secrets,
           userId: _activeUserId,
           onSaved: () => _reSortListAndNotify(_secrets, 'Secret updated successfully!'),
@@ -630,6 +632,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         );
       case 2:
         return ContactsTabView(
+          key: ValueKey('contacts_${_contacts.length}_$_isLoading'),
           items: _contacts,
           userId: _activeUserId,
           onSaved: () => _reSortListAndNotify(_contacts, 'Contact updated successfully!'),
@@ -643,6 +646,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         );
       case 3:
         return BirthdaysTabView(
+          key: ValueKey('birthdays_${_birthdays.length}_$_isLoading'),
           items: _birthdays,
           userId: _activeUserId,
           onSaved: () => _reSortListAndNotify(_birthdays, 'Birthday updated successfully!'),
@@ -657,6 +661,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       case 4:
       default:
         return WifiTabView(
+          key: ValueKey('wifi_${_wifiNetworks.length}_$_isLoading'),
           items: _wifiNetworks,
           userId: _activeUserId,
           onSaved: () => _reSortListAndNotify(_wifiNetworks, 'Wi-Fi network updated successfully!'),
@@ -687,16 +692,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       type: type,
       itemId: itemId,
       userId: _activeUserId!,
-      onDeleted: () {
+      onDeleted: () async {
+        // 1. Immediately engage skeleton loading feedback
         setState(() {
+          _isLoading = true;
           targetList.removeWhere((element) => element['id'].toString() == itemId);
         });
-        _loadVaultData();
+
+        // 2. Fetch fresh snapshot from local SQLite
+        await _loadVaultData();
+
         if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               backgroundColor: AppColors.primaryMatcha,
               behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               content: Text('$itemTypeLabel deleted successfully!'),
             ),
           );

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import '../services/local_vault_db.dart';
 import '../neon_sync_service.dart';
 import '../theme.dart';
 import 'modal_components.dart';
@@ -159,18 +161,61 @@ class AddBirthdayModal {
               ModalComponents.submitButton(
                 onPressed: () async {
                   Navigator.pop(ctx);
-                  await NeonSyncService.createVaultItem(
-                    userId: userId,
-                    type: 'birthday',
-                    data: {
-                      'name': nameCtrl.text.trim(),
-                      'birthdate': dateCtrl.text.trim().isEmpty
-                          ? '2000-01-01'
-                          : dateCtrl.text.trim(),
-                      'relationship': relCtrl.text.trim(),
-                    },
+                  final newId = const Uuid().v4();
+                  final nowIso = DateTime.now().toIso8601String();
+                  final birthdateStr = dateCtrl.text.trim().isEmpty ? '2000-01-01' : dateCtrl.text.trim();
+                  final payload = {
+                    'id': newId,
+                    'user_id': userId,
+                    'name': nameCtrl.text.trim(),
+                    'relationship': relCtrl.text.trim(),
+                    'birthdate': birthdateStr,
+                    'notes': '',
+                    'is_pinned': 0,
+                    'created_at': nowIso,
+                    'updated_at': nowIso,
+                  };
+
+                  // 1. Instant Local Save with is_synced = 0
+                  await LocalVaultDb.instance.upsertLocalItem(
+                    table: 'local_family_members',
+                    row: payload,
+                    markDirty: true,
                   );
                   onAdded();
+
+                  // 2. Silent Cloud Push if connected
+                  try {
+                    final createdItem = await NeonSyncService.createVaultItem(
+                      userId: userId,
+                      type: 'birthday',
+                      data: {
+                        'name': nameCtrl.text.trim(),
+                        'birthdate': birthdateStr,
+                        'relationship': relCtrl.text.trim(),
+                      },
+                    );
+                    if (createdItem != null && createdItem['id'] != null) {
+                      final serverId = createdItem['id'].toString();
+                      if (serverId != newId) {
+                        final db = await LocalVaultDb.instance.database;
+                        await db.delete('local_family_members', where: 'id = ?', whereArgs: [newId]);
+                        payload['id'] = serverId;
+                        await LocalVaultDb.instance.upsertLocalItem(
+                          table: 'local_family_members',
+                          row: payload,
+                          markDirty: false,
+                        );
+                      } else {
+                        await LocalVaultDb.instance.markBatchSynced(
+                          table: 'local_family_members',
+                          activeIds: [newId],
+                          deletedIds: [],
+                        );
+                      }
+                      onAdded();
+                    }
+                  } catch (_) {}
                 },
               ),
             ],
