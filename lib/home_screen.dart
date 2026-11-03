@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'theme.dart';
 import 'neon_sync_service.dart';
 import 'login_screen.dart';
@@ -363,87 +362,59 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                       ),
                       const SizedBox(height: 3),
-                      Text(
-                        'PassKeep • $totalCount Items Secured',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: AppColors.textMuted,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            'PassKeep • $totalCount Items',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          if (_unsyncedCount > 0) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: AppColors.alertPersimmon.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppColors.alertPersimmon.withValues(alpha: 0.35), width: 1),
+                              ),
+                              child: Text(
+                                '$_unsyncedCount OFFLINE',
+                                style: const TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.4,
+                                  color: AppColors.alertPersimmon,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
-                  Row(
-                    children: [
-                      // 🔄 1-Click Refresh / Sync Button
-                      GestureDetector(
-                        onTap: _isSyncing ? null : () => _triggerOneClickSync(isBackground: false),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: AppColors.cardSurface,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: _unsyncedCount > 0 ? AppColors.alertPersimmon : AppColors.primaryMatcha.withValues(alpha: 0.6),
-                              width: 1.2,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _isSyncing
-                                  ? const SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryMatcha),
-                                      ),
-                                    )
-                                  : Icon(
-                                      LucideIcons.refreshCw,
-                                      size: 14,
-                                      color: _unsyncedCount > 0 ? AppColors.alertPersimmon : AppColors.primaryMatcha,
-                                    ),
-                              const SizedBox(width: 6),
-                              Text(
-                                _isSyncing
-                                    ? 'Syncing...'
-                                    : _unsyncedCount > 0
-                                        ? 'Sync ($_unsyncedCount)'
-                                        : 'Sync',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: _unsyncedCount > 0 ? AppColors.alertPersimmon : AppColors.primaryMatcha,
-                                ),
-                              ),
-                            ],
-                          ),
+                  // Log Out Pill (Clean text, no icon)
+                  GestureDetector(
+                    onTap: _handleLogout,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardSurface,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.alertPersimmon.withValues(alpha: 0.5), width: 1.2),
+                      ),
+                      child: const Text(
+                        'Log Out',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.alertPersimmon,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      // Log Out Pill (Clean text, no icon)
-                      GestureDetector(
-                        onTap: _handleLogout,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: AppColors.cardSurface,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: AppColors.alertPersimmon.withValues(alpha: 0.5), width: 1.2),
-                          ),
-                          child: const Text(
-                            'Log Out',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.alertPersimmon,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),

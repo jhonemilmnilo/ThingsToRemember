@@ -148,6 +148,7 @@ class _WifiTabViewState extends State<WifiTabView> {
                   ),
                 )
               : ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 4),
                   itemCount: filteredItems.length,
                   itemBuilder: (context, index) {

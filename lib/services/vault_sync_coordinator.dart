@@ -99,7 +99,7 @@ class VaultSyncCoordinator {
           syncedCount: pushedCount,
           message: pushedCount > 0
               ? 'All items are synced'
-              : 'All items are synced locally',
+              : 'Youre offline',
         );
       }
 
@@ -153,7 +153,7 @@ class VaultSyncCoordinator {
         success: pushedCount > 0,
         isOffline: true,
         syncedCount: pushedCount,
-        message: 'All items are synced locally',
+        message: 'Youre offline',
       );
     }
   }
