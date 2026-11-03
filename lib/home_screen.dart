@@ -183,9 +183,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _triggerOneClickSync({bool isBackground = false}) async {
     if (_activeUserId == null || _isSyncing) return;
 
-    if (!isBackground) {
-      setState(() => _isSyncing = true);
-    }
+    setState(() {
+      _isSyncing = true;
+      _isLoading = true; // 👈 Shows shimmer skeleton immediately across the screen!
+    });
 
     final result = await VaultSyncCoordinator.instance.syncVault(
       userEmail: widget.userEmail,
@@ -707,10 +708,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _reSortListAndNotify(List<dynamic> targetList, String? message) {
     setState(() {
       targetList.sort((a, b) {
-        final aPinned = (a['is_pinned'] == true) ? 1 : 0;
-        final bPinned = (b['is_pinned'] == true) ? 1 : 0;
+        final aPinned = (a['is_pinned'] == true || a['is_pinned'] == 1) ? 1 : 0;
+        final bPinned = (b['is_pinned'] == true || b['is_pinned'] == 1) ? 1 : 0;
         if (aPinned != bPinned) return bPinned.compareTo(aPinned);
-        return (b['created_at'] ?? '').toString().compareTo((a['created_at'] ?? '').toString());
+
+        final aSynced = (a['is_synced'] == null || a['is_synced'] == 1 || a['is_synced'] == true) ? 1 : 0;
+        final bSynced = (b['is_synced'] == null || b['is_synced'] == 1 || b['is_synced'] == true) ? 1 : 0;
+        if (aSynced != bSynced) return aSynced.compareTo(bSynced); // Unsynced items (0) go on top
+
+        final bTime = (b['updated_at'] ?? b['created_at'] ?? '').toString();
+        final aTime = (a['updated_at'] ?? a['created_at'] ?? '').toString();
+        return bTime.compareTo(aTime);
       });
     });
 

@@ -153,6 +153,7 @@ class _BirthdaysTabViewState extends State<BirthdaysTabView> {
                   itemCount: filteredItems.length,
                   itemBuilder: (context, index) {
                     final item = filteredItems[index];
+                    final bool isSynced = item['is_synced'] == null || item['is_synced'] == 1 || item['is_synced'] == true;
 
                     final rawDate = item['birthdate']?.toString().split('T').first ?? '';
                     String displayDate = rawDate;
@@ -173,6 +174,7 @@ class _BirthdaysTabViewState extends State<BirthdaysTabView> {
                       subtitle: 'Born: $displayDate',
                       noteContent: item['notes'],
                       isPinned: false,
+                      isSynced: isSynced,
                       isCompact: true,
                       onTap: () {
                         if (widget.userId == null) return;

@@ -153,13 +153,15 @@ class _SecretsTabViewState extends State<SecretsTabView> {
                   itemCount: filteredItems.length,
                   itemBuilder: (context, index) {
                     final item = filteredItems[index];
-                    final bool isPinned = item['is_pinned'] == true;
+                    final bool isPinned = item['is_pinned'] == true || item['is_pinned'] == 1;
+                    final bool isSynced = item['is_synced'] == null || item['is_synced'] == 1 || item['is_synced'] == true;
 
                     return VaultItemCard(
                       title: item['title'] ?? 'Secret Note',
                       // Omit subtitle/content to keep secrets private in list
                       subtitle: null,
                       isPinned: isPinned,
+                      isSynced: isSynced,
                       isCompact: true,
                       onTap: () {
                         if (widget.userId == null) return;

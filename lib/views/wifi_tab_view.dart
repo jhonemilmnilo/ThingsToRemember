@@ -152,6 +152,7 @@ class _WifiTabViewState extends State<WifiTabView> {
                   itemCount: filteredItems.length,
                   itemBuilder: (context, index) {
                     final item = filteredItems[index];
+                    final bool isSynced = item['is_synced'] == null || item['is_synced'] == 1 || item['is_synced'] == true;
 
                     return VaultItemCard(
                       title: item['ssid'] ?? 'Wi-Fi Network',
@@ -160,6 +161,7 @@ class _WifiTabViewState extends State<WifiTabView> {
                       subtitle: '••••••••••••',
                       noteContent: item['notes'],
                       isPinned: false,
+                      isSynced: isSynced,
                       isCompact: true,
                       onTap: () {
                         if (widget.userId == null) return;

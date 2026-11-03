@@ -7,6 +7,7 @@ class VaultItemCard extends StatelessWidget {
   final String? noteContent;
   final String? tag;
   final bool isPinned;
+  final bool isSynced;
   final bool isCompact;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
@@ -18,6 +19,7 @@ class VaultItemCard extends StatelessWidget {
     this.noteContent,
     this.tag,
     this.isPinned = false,
+    this.isSynced = true,
     this.isCompact = false,
     required this.onTap,
     this.onLongPress,
@@ -85,6 +87,25 @@ class VaultItemCard extends StatelessWidget {
                       ),
                     ],
                     const Spacer(),
+                    if (!isSynced)
+                      Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: AppColors.alertPersimmon.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.alertPersimmon.withValues(alpha: 0.35), width: 1),
+                        ),
+                        child: const Text(
+                          'UNSYNCED',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            letterSpacing: 0.5,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.alertPersimmon,
+                          ),
+                        ),
+                      ),
                     if (isPinned)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

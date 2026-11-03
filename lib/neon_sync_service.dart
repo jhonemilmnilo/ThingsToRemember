@@ -156,7 +156,7 @@ class NeonSyncService {
   }
 
   /// Create an item in Neon DB (Protected by Bearer Token)
-  static Future<bool> createVaultItem({
+  static Future<Map<String, dynamic>?> createVaultItem({
     required String userId,
     required String type, // 'password' | 'secret' | 'contact' | 'birthday' | 'wifi'
     required Map<String, dynamic> data,
@@ -174,11 +174,14 @@ class NeonSyncService {
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
-        return decoded['success'] == true;
+        if (decoded['success'] == true && decoded['item'] != null) {
+          return decoded['item'] as Map<String, dynamic>;
+        }
+        return {'success': true};
       }
-      return false;
+      return null;
     } catch (_) {
-      return false;
+      return null;
     }
   }
 

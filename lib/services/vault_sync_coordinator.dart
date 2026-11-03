@@ -204,13 +204,27 @@ class VaultSyncCoordinator {
           successCount++;
         } else {
           // If update failed (e.g. item doesn't exist on server yet), try create
-          final created = await NeonSyncService.createVaultItem(
+          final createdItem = await NeonSyncService.createVaultItem(
             userId: userId,
             type: type,
             data: payload,
           );
-          if (created) {
-            successfullySyncedIds.add(id);
+          if (createdItem != null) {
+            final serverId = createdItem['id']?.toString();
+            if (serverId != null && serverId != id) {
+              // Replace local temporary UUID with server generated UUID to prevent duplicates
+              final db = await _db.database;
+              await db.delete(tableName, where: 'id = ?', whereArgs: [id]);
+              payload['id'] = serverId;
+              payload['is_synced'] = 1;
+              await _db.upsertLocalItem(
+                table: tableName,
+                row: payload,
+                markDirty: false,
+              );
+            } else {
+              successfullySyncedIds.add(id);
+            }
             successCount++;
           }
         }

@@ -107,23 +107,37 @@ class AddAccountModal {
 
                       // 2. Silent Cloud Push if connected
                       try {
-                        final created = await NeonSyncService.createVaultItem(
+                        final createdItem = await NeonSyncService.createVaultItem(
                           userId: userId,
                           type: 'password',
                           data: {
-                            'id': newId,
                             'title': titleCtrl.text.trim(),
                             'username_or_email': userCtrl.text.trim(),
                             'password': passCtrl.text.trim(),
                             'notes': notesCtrl.text.trim(),
                           },
                         );
-                        if (created) {
-                          await LocalVaultDb.instance.markBatchSynced(
-                            table: 'local_credentials',
-                            activeIds: [newId],
-                            deletedIds: [],
-                          );
+
+                        if (createdItem != null && createdItem['id'] != null) {
+                          final serverId = createdItem['id'].toString();
+                          // If Neon generated a new ID, update our local ID to match server ID so no duplicate occurs on pull
+                          if (serverId != newId) {
+                            final db = await LocalVaultDb.instance.database;
+                            await db.delete('local_credentials', where: 'id = ?', whereArgs: [newId]);
+                            payload['id'] = serverId;
+                            payload['encrypted_password'] = createdItem['encrypted_password'] ?? passCtrl.text.trim();
+                            await LocalVaultDb.instance.upsertLocalItem(
+                              table: 'local_credentials',
+                              row: payload,
+                              markDirty: false,
+                            );
+                          } else {
+                            await LocalVaultDb.instance.markBatchSynced(
+                              table: 'local_credentials',
+                              activeIds: [newId],
+                              deletedIds: [],
+                            );
+                          }
                           onAdded();
                         }
                       } catch (_) {}

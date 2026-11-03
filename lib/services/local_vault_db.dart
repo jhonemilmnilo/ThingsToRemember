@@ -128,35 +128,35 @@ class LocalVaultDb {
       'local_credentials',
       where: 'user_id = ? AND is_deleted = 0',
       whereArgs: [userId],
-      orderBy: 'is_pinned DESC, updated_at DESC',
+      orderBy: 'is_pinned DESC, is_synced ASC, updated_at DESC, created_at DESC',
     );
 
     final secrets = await db.query(
       'local_secure_notes',
       where: 'user_id = ? AND is_deleted = 0',
       whereArgs: [userId],
-      orderBy: 'is_pinned DESC, updated_at DESC',
+      orderBy: 'is_pinned DESC, is_synced ASC, updated_at DESC, created_at DESC',
     );
 
     final contacts = await db.query(
       'local_emergency_contacts',
       where: 'user_id = ? AND is_deleted = 0',
       whereArgs: [userId],
-      orderBy: 'is_pinned DESC, updated_at DESC',
+      orderBy: 'is_pinned DESC, is_synced ASC, updated_at DESC, created_at DESC',
     );
 
     final birthdays = await db.query(
       'local_family_members',
       where: 'user_id = ? AND is_deleted = 0',
       whereArgs: [userId],
-      orderBy: 'is_pinned DESC, updated_at DESC',
+      orderBy: 'is_pinned DESC, is_synced ASC, updated_at DESC, created_at DESC',
     );
 
     final wifi = await db.query(
       'local_wifi_networks',
       where: 'user_id = ? AND is_deleted = 0',
       whereArgs: [userId],
-      orderBy: 'is_pinned DESC, updated_at DESC',
+      orderBy: 'is_pinned DESC, is_synced ASC, updated_at DESC, created_at DESC',
     );
 
     return {
