@@ -19,6 +19,7 @@ import 'modals/master_password_modal.dart';
 import 'services/biometric_service.dart';
 import 'services/local_vault_db.dart';
 import 'services/vault_sync_coordinator.dart';
+import 'views/components/vault_skeleton_loading.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userName;
@@ -501,13 +502,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             Expanded(
               child: _isVaultLocked
                   ? _buildLockedPrivacyShield()
-                  : _isLoading
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryMatcha),
-                          ),
-                        )
+                  : (_isLoading || _isSyncing)
+                      ? const VaultSkeletonLoading()
                       : RefreshIndicator(
                           onRefresh: () => _triggerOneClickSync(isBackground: false),
                           color: AppColors.primaryMatcha,
