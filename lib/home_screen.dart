@@ -690,6 +690,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         setState(() {
           targetList.removeWhere((element) => element['id'].toString() == itemId);
         });
+        _loadVaultData();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

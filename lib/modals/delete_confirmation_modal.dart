@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../neon_sync_service.dart';
+import '../services/local_vault_db.dart';
 
 class DeleteConfirmationModal {
   static void show({
@@ -123,19 +124,42 @@ class DeleteConfirmationModal {
                               ? null
                               : () async {
                                   setModalState(() => isDeleting = true);
-                                  final success = await NeonSyncService.deleteVaultItem(
-                                    userId: userId,
-                                    itemId: itemId,
-                                    type: type,
+
+                                  // Map item type to SQLite table
+                                  String table = 'local_credentials';
+                                  if (type == 'secret') table = 'local_secure_notes';
+                                  if (type == 'contact') table = 'local_emergency_contacts';
+                                  if (type == 'birthday') table = 'local_family_members';
+                                  if (type == 'wifi') table = 'local_wifi_networks';
+
+                                  // 1. Soft delete locally immediately (so UI and SQLite are clean)
+                                  await LocalVaultDb.instance.softDeleteItem(
+                                    table: table,
+                                    id: itemId,
                                   );
+
+                                  // 2. Try deleting from Neon
+                                  try {
+                                    final success = await NeonSyncService.deleteVaultItem(
+                                      userId: userId,
+                                      itemId: itemId,
+                                      type: type,
+                                    );
+                                    if (success) {
+                                      // Purge from SQLite permanently
+                                      await LocalVaultDb.instance.markBatchSynced(
+                                        table: table,
+                                        activeIds: [],
+                                        deletedIds: [itemId],
+                                      );
+                                    }
+                                  } catch (_) {}
 
                                   if (context.mounted) {
                                     Navigator.of(modalContext).pop();
                                   }
 
-                                  if (success) {
-                                    onDeleted();
-                                  }
+                                  onDeleted();
                                 },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.alertPersimmon,

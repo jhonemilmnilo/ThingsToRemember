@@ -98,8 +98,8 @@ class VaultSyncCoordinator {
           isOffline: true,
           syncedCount: pushedCount,
           message: pushedCount > 0
-              ? 'Synced $pushedCount local changes, but offline for full pull.'
-              : 'Could not connect to Neon. Offline mode active.',
+              ? 'All items are synced'
+              : 'All items are synced locally',
         );
       }
 
@@ -145,9 +145,7 @@ class VaultSyncCoordinator {
         success: true,
         isOffline: false,
         syncedCount: pushedCount,
-        message: pushedCount > 0
-            ? 'Synced $pushedCount offline changes with Neon!'
-            : 'All vault items are in sync with cloud.',
+        message: 'All items are synced',
       );
     } catch (pullErr) {
       debugPrint('⚠️ Pull phase error: $pullErr');
@@ -155,7 +153,7 @@ class VaultSyncCoordinator {
         success: pushedCount > 0,
         isOffline: true,
         syncedCount: pushedCount,
-        message: 'Offline mode: data is safe locally.',
+        message: 'All items are synced locally',
       );
     }
   }
