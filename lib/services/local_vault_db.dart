@@ -160,11 +160,11 @@ class LocalVaultDb {
     );
 
     return {
-      'passwords': credentials,
-      'secrets': secrets,
-      'contacts': contacts,
-      'birthdays': birthdays,
-      'wifi': wifi,
+      'passwords': List<Map<String, dynamic>>.from(credentials),
+      'secrets': List<Map<String, dynamic>>.from(secrets),
+      'contacts': List<Map<String, dynamic>>.from(contacts),
+      'birthdays': List<Map<String, dynamic>>.from(birthdays),
+      'wifi': List<Map<String, dynamic>>.from(wifi),
     };
   }
 

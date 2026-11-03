@@ -693,12 +693,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       itemId: itemId,
       userId: _activeUserId!,
       onDeleted: () async {
-        // 1. Instantly remove from memory list and notify state so card vanishes with zero lag
+        // 1. Instantly remove from the active in-memory state list and re-assign a new mutable list
         setState(() {
           targetList.removeWhere((element) => element['id'].toString() == itemId);
+          if (type == 'password') _passwords = List.from(_passwords);
+          if (type == 'secret') _secrets = List.from(_secrets);
+          if (type == 'contact') _contacts = List.from(_contacts);
+          if (type == 'birthday') _birthdays = List.from(_birthdays);
+          if (type == 'wifi') _wifiNetworks = List.from(_wifiNetworks);
         });
 
-        // 2. Fetch fresh snapshot from local SQLite to ensure full list integrity
+        // 2. Fetch fresh snapshot from local SQLite to ensure database consistency
         await _loadVaultData();
 
         if (mounted) {
