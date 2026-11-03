@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'theme.dart';
 import 'neon_sync_service.dart';
 import 'login_screen.dart';
@@ -16,6 +17,8 @@ import 'modals/add_wifi_modal.dart';
 import 'modals/delete_confirmation_modal.dart';
 import 'modals/master_password_modal.dart';
 import 'services/biometric_service.dart';
+import 'services/local_vault_db.dart';
+import 'services/vault_sync_coordinator.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userName;
@@ -36,6 +39,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _selectedTabIndex = 0;
   bool _isLoading = true;
+  bool _isSyncing = false;
+  int _unsyncedCount = 0;
   String? _activeUserId;
 
   // 🔒 Phase 5: Auto-Lock & Background Inactivity Shield
@@ -150,65 +155,72 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _loadVaultData() async {
-    setState(() => _isLoading = true);
-    final result = await NeonSyncService.fetchVaultItems(
-      email: widget.userEmail,
-      userId: _activeUserId,
+    // 1. Instant Local Read from SQLite (Zero loading delay!)
+    if (_activeUserId != null) {
+      final localItems = await LocalVaultDb.instance.getAllVaultItems(_activeUserId!);
+      final unsynced = await LocalVaultDb.instance.getUnsyncedCount(_activeUserId!);
+
+      if (mounted) {
+        setState(() {
+          _passwords = localItems['passwords'] ?? [];
+          _secrets = localItems['secrets'] ?? [];
+          _contacts = localItems['contacts'] ?? [];
+          _birthdays = localItems['birthdays'] ?? [];
+          _wifiNetworks = localItems['wifi'] ?? [];
+          _unsyncedCount = unsynced;
+          _isLoading = false;
+        });
+      }
+    }
+
+    // 2. Initial Silent Background Pull if local was empty
+    if (_passwords.isEmpty && _secrets.isEmpty && _contacts.isEmpty && _birthdays.isEmpty && _wifiNetworks.isEmpty) {
+      _triggerOneClickSync(isBackground: true);
+    }
+  }
+
+  Future<void> _triggerOneClickSync({bool isBackground = false}) async {
+    if (_activeUserId == null || _isSyncing) return;
+
+    if (!isBackground) {
+      setState(() => _isSyncing = true);
+    }
+
+    final result = await VaultSyncCoordinator.instance.syncVault(
+      userEmail: widget.userEmail,
+      userId: _activeUserId!,
     );
 
     if (!mounted) return;
 
-    // 🚨 Handle 401 Unauthorized (Expired or Invalid Session Token)
-    if (result != null && result['unauthorized'] == true) {
-      debugPrint('🚨 Session token expired or invalid. Purging keystore & requesting re-auth.');
-      await BiometricService.clearStoredSession();
-      NeonSyncService.clearSession();
+    // Refresh local cache after sync
+    final localItems = await LocalVaultDb.instance.getAllVaultItems(_activeUserId!);
+    final unsynced = await LocalVaultDb.instance.getUnsyncedCount(_activeUserId!);
 
+    setState(() {
+      _passwords = localItems['passwords'] ?? [];
+      _secrets = localItems['secrets'] ?? [];
+      _contacts = localItems['contacts'] ?? [];
+      _birthdays = localItems['birthdays'] ?? [];
+      _wifiNetworks = localItems['wifi'] ?? [];
+      _unsyncedCount = unsynced;
+      _isSyncing = false;
+      _isLoading = false;
+    });
+
+    if (!isBackground) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.alertPersimmon,
+          backgroundColor: result.isOffline ? AppColors.alertPersimmon : AppColors.primaryMatcha,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          content: const Text(
-            'Session expired for your security. Please enter your Master Password.',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          content: Text(
+            result.message,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
           ),
         ),
       );
-
-      // Re-prompt Master Password Modal to mint a fresh token
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogCtx) => MasterPasswordModal(
-          email: widget.userEmail,
-          userName: widget.userName,
-          userId: _activeUserId,
-          isSetupMode: false,
-          onAuthenticated: () {
-            // Once re-authenticated with fresh token, reload vault!
-            _loadVaultData();
-          },
-        ),
-      );
-      return;
-    }
-
-    if (result != null) {
-      setState(() {
-        _activeUserId = result['userId'] ?? _activeUserId;
-        _passwords = result['passwords'] ?? [];
-        _secrets = result['secrets'] ?? [];
-        _contacts = result['contacts'] ?? [];
-        _birthdays = result['birthdays'] ?? [];
-        _wifiNetworks = result['wifi'] ?? [];
-        _isLoading = false;
-      });
-    } else {
-      setState(() => _isLoading = false);
     }
   }
 
@@ -259,8 +271,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     if (confirmed != true) return;
 
-    // 🛡️ Explicitly wipe hardware Keystore credentials on logout
+    // 🛡️ Explicitly wipe hardware Keystore credentials and local SQLite on logout
     await BiometricService.clearStoredSession();
+    await LocalVaultDb.instance.clearAllLocalData();
     NeonSyncService.clearSession();
     try {
       await GoogleSignIn().signOut();
@@ -358,25 +371,77 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     ],
                   ),
-                  // Log Out Pill (Clean text, no icon)
-                  GestureDetector(
-                    onTap: _handleLogout,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: AppColors.cardSurface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.alertPersimmon.withValues(alpha: 0.5), width: 1.2),
-                      ),
-                      child: const Text(
-                        'Log Out',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.alertPersimmon,
+                  Row(
+                    children: [
+                      // 🔄 1-Click Refresh / Sync Button
+                      GestureDetector(
+                        onTap: _isSyncing ? null : () => _triggerOneClickSync(isBackground: false),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardSurface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: _unsyncedCount > 0 ? AppColors.alertPersimmon : AppColors.primaryMatcha.withValues(alpha: 0.6),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _isSyncing
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryMatcha),
+                                      ),
+                                    )
+                                  : Icon(
+                                      LucideIcons.refreshCw,
+                                      size: 14,
+                                      color: _unsyncedCount > 0 ? AppColors.alertPersimmon : AppColors.primaryMatcha,
+                                    ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _isSyncing
+                                    ? 'Syncing...'
+                                    : _unsyncedCount > 0
+                                        ? 'Sync ($_unsyncedCount)'
+                                        : 'Sync',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: _unsyncedCount > 0 ? AppColors.alertPersimmon : AppColors.primaryMatcha,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      // Log Out Pill (Clean text, no icon)
+                      GestureDetector(
+                        onTap: _handleLogout,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardSurface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.alertPersimmon.withValues(alpha: 0.5), width: 1.2),
+                          ),
+                          child: const Text(
+                            'Log Out',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.alertPersimmon,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -444,8 +509,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ),
                         )
                       : RefreshIndicator(
-                          onRefresh: _loadVaultData,
+                          onRefresh: () => _triggerOneClickSync(isBackground: false),
                           color: AppColors.primaryMatcha,
+                          displacement: 24,
                           child: _buildCurrentList(),
                         ),
             ),

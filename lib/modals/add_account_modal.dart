@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import '../services/local_vault_db.dart';
 import '../neon_sync_service.dart';
 import '../theme.dart';
 import 'modal_components.dart';
@@ -83,17 +85,48 @@ class AddAccountModal {
                   ModalComponents.submitButton(
                     onPressed: () async {
                       Navigator.pop(ctx);
-                      await NeonSyncService.createVaultItem(
-                        userId: userId,
-                        type: 'password',
-                        data: {
-                          'title': titleCtrl.text.trim(),
-                          'username_or_email': userCtrl.text.trim(),
-                          'password': passCtrl.text.trim(),
-                          'notes': notesCtrl.text.trim(),
-                        },
+                      final newId = const Uuid().v4();
+                      final payload = {
+                        'id': newId,
+                        'user_id': userId,
+                        'title': titleCtrl.text.trim(),
+                        'username_or_email': userCtrl.text.trim(),
+                        'encrypted_password': passCtrl.text.trim(),
+                        'iv': 'local_plain',
+                        'website_url': notesCtrl.text.trim(),
+                        'is_pinned': 0,
+                      };
+
+                      // 1. Instant Local Save with is_synced = 0
+                      await LocalVaultDb.instance.upsertLocalItem(
+                        table: 'local_credentials',
+                        row: payload,
+                        markDirty: true,
                       );
                       onAdded();
+
+                      // 2. Silent Cloud Push if connected
+                      try {
+                        final created = await NeonSyncService.createVaultItem(
+                          userId: userId,
+                          type: 'password',
+                          data: {
+                            'id': newId,
+                            'title': titleCtrl.text.trim(),
+                            'username_or_email': userCtrl.text.trim(),
+                            'password': passCtrl.text.trim(),
+                            'notes': notesCtrl.text.trim(),
+                          },
+                        );
+                        if (created) {
+                          await LocalVaultDb.instance.markBatchSynced(
+                            table: 'local_credentials',
+                            activeIds: [newId],
+                            deletedIds: [],
+                          );
+                          onAdded();
+                        }
+                      } catch (_) {}
                     },
                   ),
                 ],
